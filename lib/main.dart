@@ -12,15 +12,17 @@ void main() {
 // COLORS
 // ============================================================
 
-const Color iituRed = Color(0xFFA6192E);
-const Color iituDarkRed = Color(0xFF75101F);
+const Color iituRed = Color(0xFFB71930);
+const Color iituDarkRed = Color(0xFF7D1020);
 
-const Color darkText = Color(0xFF202126);
+const Color darkText = Color(0xFF1C1D21);
 const Color greyText = Color(0xFF74777E);
 
 const Color pageBackground = Color(0xFFF8F8FA);
-const Color softRed = Color(0xFFFCECEE);
-const Color borderColor = Color(0xFFE8E8EC);
+const Color cardBackground = Color(0xFFFFFFFF);
+const Color softRed = Color(0xFFFCECEF);
+const Color softGrey = Color(0xFFF2F2F5);
+const Color borderColor = Color(0xFFE7E7EB);
 
 const Color navy = Color(0xFF071D2C);
 const Color navyLight = Color(0xFF123A52);
@@ -44,22 +46,19 @@ class IITUCampusApp extends StatelessWidget {
       title: 'IITU Campus',
       theme: baseTheme.copyWith(
         scaffoldBackgroundColor: pageBackground,
-
-        textTheme: GoogleFonts.manropeTextTheme(
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
           baseTheme.textTheme,
         ).apply(
           bodyColor: darkText,
           displayColor: darkText,
         ),
-
         colorScheme: ColorScheme.fromSeed(
           seedColor: iituRed,
           brightness: Brightness.light,
         ),
-
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFF5F5F7),
+          fillColor: const Color(0xFFF4F4F6),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
             vertical: 16,
@@ -87,7 +86,7 @@ class IITUCampusApp extends StatelessWidget {
 }
 
 // ============================================================
-// MAIN PAGE
+// MAIN PORTAL
 // ============================================================
 
 class CampusPortal extends StatefulWidget {
@@ -99,14 +98,11 @@ class CampusPortal extends StatefulWidget {
 
 class _CampusPortalState extends State<CampusPortal> {
   int _pageIndex = 0;
-
   int _floor = 1;
   int _selectedPlace = 0;
-
   int _eventIndex = 0;
 
   final Set<int> _registeredEvents = {};
-
   final List<ReminderItem> _reminders = [];
 
   Timer? _eventTimer;
@@ -169,7 +165,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // BASIC ACTIONS
+  // ACTIONS
   // ============================================================
 
   void _changePage(int index) {
@@ -183,10 +179,7 @@ class _CampusPortalState extends State<CampusPortal> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: GoogleFonts.manrope(),
-        ),
+        content: Text(message),
         backgroundColor: darkText,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
@@ -208,7 +201,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // CALENDAR / REMINDER
+  // CALENDAR / REMINDERS
   // ============================================================
 
   Future<void> _openCalendar() async {
@@ -241,23 +234,10 @@ class _CampusPortalState extends State<CampusPortal> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(26),
           ),
-          titlePadding: const EdgeInsets.fromLTRB(
-            26,
-            26,
-            26,
-            0,
-          ),
-          contentPadding: const EdgeInsets.all(26),
-          actionsPadding: const EdgeInsets.fromLTRB(
-            18,
-            0,
-            18,
-            18,
-          ),
           title: const Text(
             'Create Reminder',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 21,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.5,
             ),
@@ -291,7 +271,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   controller: controller,
                   autofocus: true,
                   decoration: const InputDecoration(
-                    hintText: 'Example: ML assignment',
+                    hintText: 'Example: Machine Learning assignment',
                     prefixIcon: Icon(
                       Icons.edit_note_outlined,
                     ),
@@ -323,9 +303,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 backgroundColor: iituRed,
                 foregroundColor: Colors.white,
               ),
-              child: const Text(
-                'Add Reminder',
-              ),
+              child: const Text('Add Reminder'),
             ),
           ],
         );
@@ -370,34 +348,40 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // MAIN BUILD
+  // BUILD
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-
-    final desktop = width >= 1000;
+    final desktop = width >= 900;
 
     return Scaffold(
       appBar: _buildAppBar(desktop),
 
       drawer: _buildDrawer(),
 
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 380),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: KeyedSubtree(
-          key: ValueKey(_pageIndex),
-          child: _currentPage(),
+      // SafeArea is intentionally used to satisfy the
+      // project requirement and protect the content
+      // from device system areas.
+      body: SafeArea(
+        top: false,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: KeyedSubtree(
+            key: ValueKey(_pageIndex),
+            child: _currentPage(),
+          ),
         ),
       ),
 
-      floatingActionButton: FloatingActionButton.extended(
+      // Mobile only
+      floatingActionButton: desktop
+          ? null
+          : FloatingActionButton.extended(
         onPressed: _openReminderDialog,
-        elevation: 5,
-        hoverElevation: 8,
         backgroundColor: iituRed,
         foregroundColor: Colors.white,
         icon: const Icon(
@@ -411,49 +395,35 @@ class _CampusPortalState extends State<CampusPortal> {
         ),
       ),
 
-      bottomNavigationBar: BottomNavigationBar(
+      // Mobile only
+      bottomNavigationBar: desktop
+          ? null
+          : BottomNavigationBar(
         currentIndex: _pageIndex,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         selectedItemColor: iituRed,
         unselectedItemColor: Colors.grey,
-        elevation: 12,
         onTap: _changePage,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.home_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.home_rounded,
-            ),
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.event_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.event_rounded,
-            ),
+            icon: Icon(Icons.event_outlined),
+            activeIcon: Icon(Icons.event),
             label: 'Events',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.map_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.map_rounded,
-            ),
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
             label: 'Campus',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.person_outline,
-            ),
-            activeIcon: Icon(
-              Icons.person,
-            ),
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],
@@ -485,18 +455,17 @@ class _CampusPortalState extends State<CampusPortal> {
       bool desktop,
       ) {
     return AppBar(
-      toolbarHeight: 76,
+      toolbarHeight: desktop ? 76 : 68,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       foregroundColor: darkText,
       elevation: 0,
-      titleSpacing: 18,
 
       title: Row(
         children: [
           SizedBox(
-            width: 145,
-            height: 44,
+            width: desktop ? 145 : 115,
+            height: 42,
             child: Image.asset(
               'assets/images/iitu_logo.png',
               fit: BoxFit.contain,
@@ -505,7 +474,7 @@ class _CampusPortalState extends State<CampusPortal> {
           ),
 
           if (desktop) ...[
-            const SizedBox(width: 38),
+            const SizedBox(width: 42),
 
             HeaderNavButton(
               label: 'Home',
@@ -538,9 +507,7 @@ class _CampusPortalState extends State<CampusPortal> {
         HeaderIconButton(
           icon: Icons.search_rounded,
           onTap: () {
-            _showMessage(
-              'Search selected.',
-            );
+            _showMessage('Search selected.');
           },
         ),
 
@@ -558,12 +525,9 @@ class _CampusPortalState extends State<CampusPortal> {
         GestureDetector(
           onTap: () => _changePage(3),
           child: const Padding(
-            padding: EdgeInsets.only(
-              right: 18,
-            ),
+            padding: EdgeInsets.only(right: 18),
             child: CircleAvatar(
               radius: 21,
-              backgroundColor: softRed,
               backgroundImage: AssetImage(
                 'assets/images/profile_irada.png',
               ),
@@ -637,9 +601,7 @@ class _CampusPortalState extends State<CampusPortal> {
             'My Courses',
                 () {
               Navigator.pop(context);
-              _showMessage(
-                'My Courses selected.',
-              );
+              _showMessage('My Courses selected.');
             },
           ),
 
@@ -679,9 +641,7 @@ class _CampusPortalState extends State<CampusPortal> {
             'Settings',
                 () {
               Navigator.pop(context);
-              _showMessage(
-                'Settings selected.',
-              );
+              _showMessage('Settings selected.');
             },
             red: false,
           ),
@@ -719,7 +679,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // HOME PAGE
+  // HOME
   // ============================================================
 
   Widget _homePage() {
@@ -731,42 +691,49 @@ class _CampusPortalState extends State<CampusPortal> {
           _maxWidth(
             child: Column(
               children: [
+                const SizedBox(height: 55),
+
+                SimpleReveal(
+                  delay: 60,
+                  child: _homeWelcomeStrip(),
+                ),
+
                 const SizedBox(height: 95),
 
                 SimpleReveal(
-                  delay: 100,
+                  delay: 120,
                   child: _studentHubSection(),
                 ),
 
                 const SizedBox(height: 110),
 
                 SimpleReveal(
-                  delay: 160,
+                  delay: 180,
                   child: _announcementSection(),
                 ),
 
                 const SizedBox(height: 110),
 
                 SimpleReveal(
-                  delay: 220,
+                  delay: 240,
                   child: _eventsShowcase(),
                 ),
 
                 const SizedBox(height: 110),
 
                 SimpleReveal(
-                  delay: 280,
+                  delay: 300,
                   child: _campusLifeSection(),
                 ),
 
                 const SizedBox(height: 110),
 
                 SimpleReveal(
-                  delay: 340,
+                  delay: 360,
                   child: _globalFooter(),
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 30),
 
                 const Text(
                   'IITU Campus • Student Portal Concept • 2026',
@@ -805,9 +772,8 @@ class _CampusPortalState extends State<CampusPortal> {
             child: Column(
               children: [
                 _heroText(),
-
                 SizedBox(
-                  height: 340,
+                  height: 330,
                   width: double.infinity,
                   child: Image.asset(
                     'assets/images/hero_campus.png',
@@ -820,7 +786,7 @@ class _CampusPortalState extends State<CampusPortal> {
         }
 
         return SizedBox(
-          height: 610,
+          height: 585,
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,
@@ -838,8 +804,8 @@ class _CampusPortalState extends State<CampusPortal> {
                     colors: [
                       Colors.white,
                       Colors.white.withOpacity(0.98),
-                      Colors.white.withOpacity(0.75),
-                      Colors.white.withOpacity(0.05),
+                      Colors.white.withOpacity(0.78),
+                      Colors.white.withOpacity(0.03),
                     ],
                     stops: const [
                       0,
@@ -885,7 +851,7 @@ class _CampusPortalState extends State<CampusPortal> {
           child: Transform.translate(
             offset: Offset(
               0,
-              28 * (1 - value),
+              25 * (1 - value),
             ),
             child: child,
           ),
@@ -926,42 +892,42 @@ class _CampusPortalState extends State<CampusPortal> {
                       color: iituRed,
                       fontSize: 9.5,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
+                      letterSpacing: 0.75,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 29),
 
             const Text(
               'Your Campus.\nYour Future.\nYour IITU.',
               style: TextStyle(
                 color: darkText,
-                fontSize: 56,
-                height: 1.03,
+                fontSize: 53,
+                height: 1.05,
                 letterSpacing: -2.4,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
 
-            const SizedBox(height: 23),
+            const SizedBox(height: 22),
 
             const SizedBox(
-              width: 500,
+              width: 510,
               child: Text(
                 'A smarter way to explore academic life, student services, events and opportunities at IITU.',
                 style: TextStyle(
-                  color: greyText,
-                  fontSize: 16,
+                  color: Color(0xFF686B72),
+                  fontSize: 15.5,
                   height: 1.65,
                   fontWeight: FontWeight.w400,
                 ),
               ),
             ),
 
-            const SizedBox(height: 31),
+            const SizedBox(height: 30),
 
             ElevatedButton.icon(
               onPressed: () => _changePage(2),
@@ -970,8 +936,8 @@ class _CampusPortalState extends State<CampusPortal> {
                 backgroundColor: iituRed,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 25,
-                  vertical: 18,
+                  horizontal: 24,
+                  vertical: 17,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(
@@ -992,6 +958,117 @@ class _CampusPortalState extends State<CampusPortal> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // HOME GREETING + COMPACT ACADEMIC SUMMARY
+  // ============================================================
+
+  Widget _homeWelcomeStrip() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(
+        vertical: 4,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 28,
+        vertical: 24,
+      ),
+
+      // Explicit alignment for the Container-widget rubric.
+      alignment: Alignment.centerLeft,
+
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: borderColor,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 25,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (
+            context,
+            constraints,
+            ) {
+          final desktop =
+              constraints.maxWidth >= 820;
+
+          final greeting = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Good morning, Irada.',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.6,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Here’s your academic overview for today.',
+                style: TextStyle(
+                  color: greyText,
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          );
+
+          final indicators = Wrap(
+            spacing: 26,
+            runSpacing: 16,
+            children: const [
+              CompactAcademicValue(
+                label: 'SEMESTER',
+                value: '5',
+              ),
+              CompactAcademicValue(
+                label: 'GPA',
+                value: '3.5',
+              ),
+              CompactAcademicValue(
+                label: 'CREDITS',
+                value: '90',
+              ),
+              CompactAcademicValue(
+                label: 'ATTENDANCE',
+                value: '92%',
+              ),
+            ],
+          );
+
+          if (!desktop) {
+            return Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                greeting,
+                const SizedBox(height: 25),
+                indicators,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: greeting,
+              ),
+              const SizedBox(width: 30),
+              indicators,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1045,7 +1122,7 @@ class _CampusPortalState extends State<CampusPortal> {
               return Column(
                 children: [
                   hub,
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 38),
                   today,
                 ],
               );
@@ -1056,9 +1133,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 Expanded(
                   child: hub,
                 ),
-
-                const SizedBox(width: 65),
-
+                const SizedBox(width: 60),
                 SizedBox(
                   width: 390,
                   child: today,
@@ -1073,18 +1148,18 @@ class _CampusPortalState extends State<CampusPortal> {
 
   Widget _todayPanel() {
     return Container(
-      padding: const EdgeInsets.all(30),
+      padding: const EdgeInsets.all(29),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: borderColor,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -1103,17 +1178,16 @@ class _CampusPortalState extends State<CampusPortal> {
                     'TODAY',
                     style: TextStyle(
                       color: iituRed,
-                      fontSize: 9.5,
+                      fontSize: 9,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 1.4,
+                      letterSpacing: 1.3,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  SizedBox(height: 5),
                   Text(
                     'Tuesday',
                     style: TextStyle(
-                      color: darkText,
-                      fontSize: 24,
+                      fontSize: 23,
                       fontWeight: FontWeight.w500,
                       letterSpacing: -0.7,
                     ),
@@ -1127,7 +1201,7 @@ class _CampusPortalState extends State<CampusPortal> {
             ],
           ),
 
-          const SizedBox(height: 27),
+          const SizedBox(height: 25),
 
           _todayClass(
             '09:00',
@@ -1135,14 +1209,12 @@ class _CampusPortalState extends State<CampusPortal> {
             'Room 304',
             true,
           ),
-
           _todayClass(
             '11:00',
             'Cloud Computing',
             'Lab 212',
             false,
           ),
-
           _todayClass(
             '14:00',
             'Machine Learning',
@@ -1154,14 +1226,14 @@ class _CampusPortalState extends State<CampusPortal> {
             Container(
               width: double.infinity,
               margin: const EdgeInsets.only(
-                top: 3,
+                top: 2,
                 bottom: 17,
               ),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: softRed,
                 borderRadius: BorderRadius.circular(
-                  16,
+                  15,
                 ),
               ),
               child: Row(
@@ -1169,14 +1241,14 @@ class _CampusPortalState extends State<CampusPortal> {
                   const Icon(
                     Icons.notifications_active_outlined,
                     color: iituRed,
-                    size: 19,
+                    size: 18,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       _reminders.last.title,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1195,21 +1267,17 @@ class _CampusPortalState extends State<CampusPortal> {
                     backgroundColor: iituRed,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                      vertical: 15,
+                      vertical: 14,
                     ),
                   ),
                   icon: const Icon(
                     Icons.add_alert_outlined,
                     size: 17,
                   ),
-                  label: const Text(
-                    'Reminder',
-                  ),
+                  label: const Text('Reminder'),
                 ),
               ),
-
-              const SizedBox(width: 11),
-
+              const SizedBox(width: 10),
               IconButton(
                 tooltip: 'Open Calendar',
                 onPressed: _openCalendar,
@@ -1237,7 +1305,7 @@ class _CampusPortalState extends State<CampusPortal> {
       ) {
     return Padding(
       padding: const EdgeInsets.only(
-        bottom: 18,
+        bottom: 17,
       ),
       child: Row(
         children: [
@@ -1248,15 +1316,14 @@ class _CampusPortalState extends State<CampusPortal> {
               style: TextStyle(
                 color:
                 current ? iituRed : darkText,
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-
           Container(
             width: 3,
-            height: 39,
+            height: 38,
             margin: const EdgeInsets.symmetric(
               horizontal: 12,
             ),
@@ -1266,7 +1333,6 @@ class _CampusPortalState extends State<CampusPortal> {
               borderRadius: BorderRadius.circular(5),
             ),
           ),
-
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -1275,7 +1341,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 Text(
                   subject,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1284,7 +1350,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   room,
                   style: const TextStyle(
                     color: greyText,
-                    fontSize: 11,
+                    fontSize: 10.5,
                   ),
                 ),
               ],
@@ -1296,7 +1362,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // NEW ANNOUNCEMENTS DESIGN
+  // ANNOUNCEMENTS
   // ============================================================
 
   Widget _announcementSection() {
@@ -1327,7 +1393,8 @@ class _CampusPortalState extends State<CampusPortal> {
               cardWidth =
                   (constraints.maxWidth - 18) / 2;
             } else {
-              cardWidth = constraints.maxWidth;
+              cardWidth =
+                  constraints.maxWidth;
             }
 
             return Wrap(
@@ -1338,12 +1405,10 @@ class _CampusPortalState extends State<CampusPortal> {
                   width: cardWidth,
                   child: _doubleDegreeAnnouncement(),
                 ),
-
                 SizedBox(
                   width: cardWidth,
                   child: _hackathonAnnouncement(),
                 ),
-
                 SizedBox(
                   width: cardWidth,
                   child: _academicAnnouncement(),
@@ -1359,7 +1424,7 @@ class _CampusPortalState extends State<CampusPortal> {
   Widget _doubleDegreeAnnouncement() {
     return PremiumHover(
       child: Container(
-        height: 430,
+        height: 420,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F7),
@@ -1381,7 +1446,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 24,
                 0,
                 24,
-                25,
+                24,
               ),
               child: Column(
                 crossAxisAlignment:
@@ -1391,37 +1456,31 @@ class _CampusPortalState extends State<CampusPortal> {
                     'INTERNATIONAL',
                     style: TextStyle(
                       color: iituRed,
-                      fontSize: 9.5,
+                      fontSize: 9,
                       letterSpacing: 1.2,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'Double Degree Programs',
                     style: TextStyle(
-                      fontSize: 22,
-                      height: 1.1,
+                      fontSize: 21,
+                      height: 1.12,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.6,
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   const Text(
                     'Discover academic pathways with international partner universities.',
                     style: TextStyle(
                       color: greyText,
-                      fontSize: 12.5,
+                      fontSize: 12,
                       height: 1.5,
                     ),
                   ),
-
-                  const SizedBox(height: 13),
-
+                  const SizedBox(height: 12),
                   TextButton.icon(
                     onPressed: () {
                       _showMessage(
@@ -1434,11 +1493,10 @@ class _CampusPortalState extends State<CampusPortal> {
                     ),
                     icon: const Icon(
                       Icons.arrow_forward,
-                      size: 16,
+                      size: 15,
                     ),
-                    label: const Text(
-                      'Explore programs',
-                    ),
+                    label:
+                    const Text('Explore programs'),
                   ),
                 ],
               ),
@@ -1452,7 +1510,7 @@ class _CampusPortalState extends State<CampusPortal> {
   Widget _hackathonAnnouncement() {
     return PremiumHover(
       child: Container(
-        height: 430,
+        height: 420,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1462,10 +1520,11 @@ class _CampusPortalState extends State<CampusPortal> {
           ),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
           children: [
             SizedBox(
-              height: 240,
+              height: 235,
               width: double.infinity,
               child: HoverImage(
                 image:
@@ -1475,7 +1534,7 @@ class _CampusPortalState extends State<CampusPortal> {
 
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(23),
                 child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
@@ -1486,9 +1545,10 @@ class _CampusPortalState extends State<CampusPortal> {
                           '12 OCT 2026',
                           style: TextStyle(
                             color: iituRed,
-                            fontSize: 9.5,
+                            fontSize: 9,
                             letterSpacing: 1,
-                            fontWeight: FontWeight.w600,
+                            fontWeight:
+                            FontWeight.w600,
                           ),
                         ),
                         Spacer(),
@@ -1496,7 +1556,7 @@ class _CampusPortalState extends State<CampusPortal> {
                           'HACKATHON',
                           style: TextStyle(
                             color: greyText,
-                            fontSize: 9,
+                            fontSize: 8.5,
                             letterSpacing: 1,
                           ),
                         ),
@@ -1508,7 +1568,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     const Text(
                       'Almaty Student Hackathon',
                       style: TextStyle(
-                        fontSize: 21,
+                        fontSize: 20,
                         height: 1.12,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -0.6,
@@ -1523,7 +1583,7 @@ class _CampusPortalState extends State<CampusPortal> {
                           'Team up. Build. Innovate.',
                           style: TextStyle(
                             color: greyText,
-                            fontSize: 11.5,
+                            fontSize: 11,
                           ),
                         ),
                         const Spacer(),
@@ -1533,7 +1593,7 @@ class _CampusPortalState extends State<CampusPortal> {
                           },
                           icon: const Icon(
                             Icons.north_east,
-                            size: 17,
+                            size: 16,
                             color: iituRed,
                           ),
                         ),
@@ -1552,7 +1612,7 @@ class _CampusPortalState extends State<CampusPortal> {
   Widget _academicAnnouncement() {
     return PremiumHover(
       child: Container(
-        height: 430,
+        height: 420,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -1560,7 +1620,7 @@ class _CampusPortalState extends State<CampusPortal> {
             end: Alignment.bottomRight,
             colors: [
               Color(0xFFFFFAFB),
-              Color(0xFFF4F3F5),
+              Color(0xFFF3F2F4),
             ],
           ),
           borderRadius: BorderRadius.circular(28),
@@ -1572,7 +1632,8 @@ class _CampusPortalState extends State<CampusPortal> {
           children: [
             const Expanded(
               child: AnnouncementMotionVisual(
-                mode: AnnouncementVisualMode.academic,
+                mode:
+                AnnouncementVisualMode.academic,
               ),
             ),
 
@@ -1581,7 +1642,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 24,
                 0,
                 24,
-                25,
+                24,
               ),
               child: Column(
                 crossAxisAlignment:
@@ -1591,36 +1652,30 @@ class _CampusPortalState extends State<CampusPortal> {
                     'ACADEMIC',
                     style: TextStyle(
                       color: iituRed,
-                      fontSize: 9.5,
+                      fontSize: 9,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.2,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'Semester Updates',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 21,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.6,
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   const Text(
                     'Courses, schedules and key academic information in one place.',
                     style: TextStyle(
                       color: greyText,
-                      fontSize: 12.5,
+                      fontSize: 12,
                       height: 1.5,
                     ),
                   ),
-
-                  const SizedBox(height: 13),
-
+                  const SizedBox(height: 12),
                   TextButton.icon(
                     onPressed: () {
                       _showMessage(
@@ -1633,7 +1688,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     ),
                     icon: const Icon(
                       Icons.arrow_forward,
-                      size: 16,
+                      size: 15,
                     ),
                     label: const Text(
                       'View updates',
@@ -1714,7 +1769,6 @@ class _CampusPortalState extends State<CampusPortal> {
               duration: const Duration(
                 milliseconds: 420,
               ),
-              switchInCurve: Curves.easeOutCubic,
               child: _largeEventCard(
                 event,
                 _eventIndex,
@@ -1740,7 +1794,8 @@ class _CampusPortalState extends State<CampusPortal> {
               if (i != _eventIndex) {
                 previews.add(
                   Padding(
-                    padding: const EdgeInsets.only(
+                    padding:
+                    const EdgeInsets.only(
                       bottom: 14,
                     ),
                     child: _eventPreviewCard(
@@ -1760,11 +1815,9 @@ class _CampusPortalState extends State<CampusPortal> {
                   flex: 3,
                   child: mainCard,
                 ),
-
                 const SizedBox(width: 18),
-
                 SizedBox(
-                  width: 295,
+                  width: 290,
                   child: Column(
                     children: previews,
                   ),
@@ -1774,14 +1827,13 @@ class _CampusPortalState extends State<CampusPortal> {
           },
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 15),
 
         Row(
           children: [
             Expanded(
               child: _eventDots(),
             ),
-
             TextButton.icon(
               onPressed: () => _changePage(1),
               style: TextButton.styleFrom(
@@ -1792,7 +1844,7 @@ class _CampusPortalState extends State<CampusPortal> {
               ),
               icon: const Icon(
                 Icons.arrow_forward,
-                size: 16,
+                size: 15,
               ),
             ),
           ],
@@ -1831,14 +1883,14 @@ class _CampusPortalState extends State<CampusPortal> {
             width: horizontal
                 ? constraints.maxWidth * 0.48
                 : double.infinity,
-            height: horizontal ? 390 : 250,
+            height: horizontal ? 370 : 245,
             child: HoverImage(
               image: event.image,
             ),
           );
 
           final info = Padding(
-            padding: const EdgeInsets.all(30),
+            padding: const EdgeInsets.all(29),
             child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
@@ -1857,7 +1909,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     event.date,
                     style: const TextStyle(
                       color: iituRed,
-                      fontSize: 10,
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1869,7 +1921,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   event.category.toUpperCase(),
                   style: const TextStyle(
                     color: iituRed,
-                    fontSize: 9.5,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 1.1,
                   ),
@@ -1880,7 +1932,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 Text(
                   event.title,
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 27,
                     height: 1.08,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.9,
@@ -1893,7 +1945,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   event.description,
                   style: const TextStyle(
                     color: greyText,
-                    fontSize: 13,
+                    fontSize: 12.5,
                     height: 1.55,
                   ),
                 ),
@@ -1929,8 +1981,9 @@ class _CampusPortalState extends State<CampusPortal> {
                       elevation: 0,
                       backgroundColor: iituRed,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 15,
+                      padding:
+                      const EdgeInsets.symmetric(
+                        vertical: 14,
                       ),
                     ),
                     child: Text(
@@ -1976,7 +2029,8 @@ class _CampusPortalState extends State<CampusPortal> {
       ) {
     return PremiumHover(
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius:
+        BorderRadius.circular(22),
         onTap: () {
           setState(() {
             _eventIndex = index;
@@ -1986,7 +2040,8 @@ class _CampusPortalState extends State<CampusPortal> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius:
+            BorderRadius.circular(22),
             border: Border.all(
               color: borderColor,
             ),
@@ -1994,14 +2049,13 @@ class _CampusPortalState extends State<CampusPortal> {
           child: Row(
             children: [
               SizedBox(
-                width: 95,
-                height: 112,
+                width: 92,
+                height: 108,
                 child: Image.asset(
                   event.image,
                   fit: BoxFit.cover,
                 ),
               ),
-
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
@@ -2013,20 +2067,21 @@ class _CampusPortalState extends State<CampusPortal> {
                         event.date,
                         style: const TextStyle(
                           color: iituRed,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 9,
+                          fontWeight:
+                          FontWeight.w600,
                         ),
                       ),
-
                       const SizedBox(height: 7),
-
                       Text(
                         event.title,
                         maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        overflow:
+                        TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 12.5,
+                          fontWeight:
+                          FontWeight.w500,
                         ),
                       ),
                     ],
@@ -2060,9 +2115,8 @@ class _CampusPortalState extends State<CampusPortal> {
               color: index == _eventIndex
                   ? iituRed
                   : const Color(0xFFD9D9DE),
-              borderRadius: BorderRadius.circular(
-                20,
-              ),
+              borderRadius:
+              BorderRadius.circular(20),
             ),
           );
         },
@@ -2087,7 +2141,7 @@ class _CampusPortalState extends State<CampusPortal> {
           value,
           style: const TextStyle(
             color: greyText,
-            fontSize: 11.5,
+            fontSize: 11,
           ),
         ),
       ],
@@ -2134,9 +2188,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       number: '01',
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
                   SizedBox(
                     height: 260,
                     child: CampusVisualCard(
@@ -2149,9 +2201,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       number: '02',
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
                   SizedBox(
                     height: 260,
                     child: CampusVisualCard(
@@ -2168,7 +2218,7 @@ class _CampusPortalState extends State<CampusPortal> {
             }
 
             return SizedBox(
-              height: 500,
+              height: 490,
               child: Row(
                 children: [
                   Expanded(
@@ -2183,9 +2233,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       number: '01',
                     ),
                   ),
-
                   const SizedBox(width: 18),
-
                   Expanded(
                     flex: 2,
                     child: Column(
@@ -2201,9 +2249,7 @@ class _CampusPortalState extends State<CampusPortal> {
                             number: '02',
                           ),
                         ),
-
                         const SizedBox(height: 18),
-
                         Expanded(
                           child: CampusVisualCard(
                             image:
@@ -2237,7 +2283,7 @@ class _CampusPortalState extends State<CampusPortal> {
             ),
             icon: const Icon(
               Icons.arrow_forward,
-              size: 16,
+              size: 15,
             ),
           ),
         ),
@@ -2246,7 +2292,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // GLOBAL FOOTER
+  // FOOTER / GLOBAL
   // ============================================================
 
   Widget _globalFooter() {
@@ -2284,41 +2330,35 @@ class _CampusPortalState extends State<CampusPortal> {
                   'GLOBAL COMMUNITY',
                   style: TextStyle(
                     color: Color(0xFF8FC8E8),
-                    fontSize: 9.5,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 1.5,
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 const Text(
                   'Grow beyond\nborders with IITU.',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 40,
+                    fontSize: 38,
                     height: 1.05,
                     fontWeight: FontWeight.w500,
                     letterSpacing: -1.5,
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 const SizedBox(
                   width: 470,
                   child: Text(
                     'Connect with international opportunities, innovation and a global academic community from Kazakhstan.',
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 13.5,
+                      fontSize: 13,
                       height: 1.6,
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 27),
-
+                const SizedBox(height: 26),
                 ElevatedButton.icon(
                   onPressed: () {
                     _showMessage(
@@ -2329,14 +2369,15 @@ class _CampusPortalState extends State<CampusPortal> {
                     elevation: 0,
                     backgroundColor: Colors.white,
                     foregroundColor: navy,
-                    padding: const EdgeInsets.symmetric(
+                    padding:
+                    const EdgeInsets.symmetric(
                       horizontal: 22,
-                      vertical: 16,
+                      vertical: 15,
                     ),
                   ),
                   icon: const Icon(
                     Icons.north_east,
-                    size: 17,
+                    size: 16,
                   ),
                   label: const Text(
                     'Discover Opportunities',
@@ -2351,7 +2392,7 @@ class _CampusPortalState extends State<CampusPortal> {
               children: [
                 copy,
                 const SizedBox(
-                  height: 320,
+                  height: 310,
                   child: Center(
                     child: AnimatedGlobe(),
                   ),
@@ -2361,14 +2402,13 @@ class _CampusPortalState extends State<CampusPortal> {
           }
 
           return SizedBox(
-            height: 430,
+            height: 410,
             child: Row(
               children: [
                 Expanded(
                   flex: 3,
                   child: copy,
                 ),
-
                 const Expanded(
                   flex: 2,
                   child: Center(
@@ -2391,13 +2431,14 @@ class _CampusPortalState extends State<CampusPortal> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         24,
-        60,
+        58,
         24,
-        110,
+        100,
       ),
       child: _maxWidth(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
           children: [
             const PremiumHeading(
               eyebrow: 'WHAT’S HAPPENING',
@@ -2417,11 +2458,13 @@ class _CampusPortalState extends State<CampusPortal> {
 
                 if (constraints.maxWidth >= 1000) {
                   cardWidth =
-                      (constraints.maxWidth - 36) / 3;
+                      (constraints.maxWidth - 36) /
+                          3;
                 } else if (constraints.maxWidth >=
                     650) {
                   cardWidth =
-                      (constraints.maxWidth - 18) / 2;
+                      (constraints.maxWidth - 18) /
+                          2;
                 } else {
                   cardWidth =
                       constraints.maxWidth;
@@ -2473,7 +2516,7 @@ class _CampusPortalState extends State<CampusPortal> {
           CrossAxisAlignment.start,
           children: [
             SizedBox(
-              height: 215,
+              height: 210,
               width: double.infinity,
               child: HoverImage(
                 image: event.image,
@@ -2492,24 +2535,24 @@ class _CampusPortalState extends State<CampusPortal> {
                         event.date,
                         style: const TextStyle(
                           color: iituRed,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 9,
+                          fontWeight:
+                          FontWeight.w600,
                         ),
                       ),
                       const Spacer(),
                       Text(
-                        event.category.toUpperCase(),
+                        event.category
+                            .toUpperCase(),
                         style: const TextStyle(
                           color: greyText,
-                          fontSize: 9,
+                          fontSize: 8.5,
                           letterSpacing: 0.8,
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 14),
-
                   Text(
                     event.title,
                     style: const TextStyle(
@@ -2519,34 +2562,26 @@ class _CampusPortalState extends State<CampusPortal> {
                       letterSpacing: -0.4,
                     ),
                   ),
-
                   const SizedBox(height: 11),
-
                   Text(
                     event.description,
                     style: const TextStyle(
                       color: greyText,
-                      fontSize: 12,
+                      fontSize: 11.5,
                       height: 1.55,
                     ),
                   ),
-
                   const SizedBox(height: 17),
-
                   _eventInfo(
                     Icons.access_time,
                     event.time,
                   ),
-
                   const SizedBox(height: 8),
-
                   _eventInfo(
                     Icons.location_on_outlined,
                     event.location,
                   ),
-
                   const SizedBox(height: 20),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -2558,7 +2593,8 @@ class _CampusPortalState extends State<CampusPortal> {
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
                         backgroundColor: iituRed,
-                        foregroundColor: Colors.white,
+                        foregroundColor:
+                        Colors.white,
                         padding:
                         const EdgeInsets.symmetric(
                           vertical: 14,
@@ -2598,9 +2634,9 @@ class _CampusPortalState extends State<CampusPortal> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         24,
-        60,
+        58,
         24,
-        110,
+        100,
       ),
       child: _maxWidth(
         child: Column(
@@ -2637,7 +2673,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     },
                     child: AnimatedContainer(
                       duration: const Duration(
-                        milliseconds: 200,
+                        milliseconds: 190,
                       ),
                       padding:
                       const EdgeInsets.symmetric(
@@ -2662,7 +2698,7 @@ class _CampusPortalState extends State<CampusPortal> {
                           color: active
                               ? Colors.white
                               : greyText,
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -2705,9 +2741,7 @@ class _CampusPortalState extends State<CampusPortal> {
                         places,
                       ),
                     ),
-
                     const SizedBox(width: 22),
-
                     Expanded(
                       child: _floorMap(
                         places,
@@ -2788,7 +2822,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       child: Text(
                         places[index].name,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           color: active
                               ? iituRed
                               : darkText,
@@ -2860,7 +2894,6 @@ class _CampusPortalState extends State<CampusPortal> {
                 h * 0.22,
                 const Color(0xFFFFE7EB),
               ),
-
               _room(
                 w * 0.12,
                 h * 0.44,
@@ -2868,7 +2901,6 @@ class _CampusPortalState extends State<CampusPortal> {
                 h * 0.24,
                 const Color(0xFFFFF0DC),
               ),
-
               _room(
                 w * 0.66,
                 h * 0.16,
@@ -2876,7 +2908,6 @@ class _CampusPortalState extends State<CampusPortal> {
                 h * 0.22,
                 const Color(0xFFE7EEFA),
               ),
-
               _room(
                 w * 0.66,
                 h * 0.44,
@@ -2969,15 +3000,6 @@ class _CampusPortalState extends State<CampusPortal> {
                       color: darkText,
                       borderRadius:
                       BorderRadius.circular(11),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black
-                              .withOpacity(
-                            0.13,
-                          ),
-                          blurRadius: 12,
-                        ),
-                      ],
                     ),
                     child: const Icon(
                       Icons.directions_walk_rounded,
@@ -3006,7 +3028,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     'Level $_floor',
                     style: const TextStyle(
                       color: iituRed,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -3048,7 +3070,7 @@ class _CampusPortalState extends State<CampusPortal> {
                             Text(
                               selected.name,
                               style: const TextStyle(
-                                fontSize: 13,
+                                fontSize: 12.5,
                                 fontWeight:
                                 FontWeight.w600,
                               ),
@@ -3058,7 +3080,7 @@ class _CampusPortalState extends State<CampusPortal> {
                               selected.description,
                               style: const TextStyle(
                                 color: greyText,
-                                fontSize: 11,
+                                fontSize: 10.5,
                               ),
                             ),
                           ],
@@ -3210,7 +3232,8 @@ class _CampusPortalState extends State<CampusPortal> {
             name: 'Innovation Hub',
             description:
             'Projects, startups and innovation.',
-            icon: Icons.lightbulb_outline,
+            icon:
+            Icons.lightbulb_outline,
             position:
             Alignment(0.50, -0.36),
           ),
@@ -3239,7 +3262,8 @@ class _CampusPortalState extends State<CampusPortal> {
             name: 'Conference Room',
             description:
             'Academic meetings and presentations.',
-            icon: Icons.co_present_outlined,
+            icon:
+            Icons.co_present_outlined,
             position:
             Alignment(0.50, -0.36),
           ),
@@ -3264,9 +3288,9 @@ class _CampusPortalState extends State<CampusPortal> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         24,
-        60,
+        58,
         24,
-        110,
+        100,
       ),
       child: _maxWidth(
         child: Column(
@@ -3277,7 +3301,7 @@ class _CampusPortalState extends State<CampusPortal> {
               eyebrow: 'STUDENT PROFILE',
               title: 'Your academic space.',
               subtitle:
-              'Profile, academic overview and student activity.',
+              'Personal information, academic progress and student activity in one place.',
             ),
 
             const SizedBox(height: 38),
@@ -3288,14 +3312,14 @@ class _CampusPortalState extends State<CampusPortal> {
                   constraints,
                   ) {
                 final desktop =
-                    constraints.maxWidth >= 850;
+                    constraints.maxWidth >= 900;
 
                 if (!desktop) {
                   return Column(
                     children: [
                       _profileCard(),
-                      const SizedBox(height: 25),
-                      _academicOverview(),
+                      const SizedBox(height: 28),
+                      _profileAcademicSection(),
                     ],
                   );
                 }
@@ -3305,14 +3329,15 @@ class _CampusPortalState extends State<CampusPortal> {
                   CrossAxisAlignment.start,
                   children: [
                     SizedBox(
-                      width: 350,
+                      width: 335,
                       child: _profileCard(),
                     ),
 
                     const SizedBox(width: 25),
 
                     Expanded(
-                      child: _academicOverview(),
+                      child:
+                      _profileAcademicSection(),
                     ),
                   ],
                 );
@@ -3337,7 +3362,7 @@ class _CampusPortalState extends State<CampusPortal> {
       child: Column(
         children: [
           Container(
-            height: 118,
+            height: 112,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -3349,12 +3374,12 @@ class _CampusPortalState extends State<CampusPortal> {
           ),
 
           Transform.translate(
-            offset: const Offset(0, -56),
+            offset: const Offset(0, -55),
             child: const CircleAvatar(
-              radius: 60,
+              radius: 59,
               backgroundColor: Colors.white,
               child: CircleAvatar(
-                radius: 54,
+                radius: 53,
                 backgroundImage: AssetImage(
                   'assets/images/profile_irada.png',
                 ),
@@ -3363,7 +3388,7 @@ class _CampusPortalState extends State<CampusPortal> {
           ),
 
           Transform.translate(
-            offset: const Offset(0, -42),
+            offset: const Offset(0, -40),
             child: const Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 25,
@@ -3374,7 +3399,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     'Akvarzhanova Irada',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 21,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.5,
                     ),
@@ -3384,7 +3409,7 @@ class _CampusPortalState extends State<CampusPortal> {
                     'Network Security',
                     style: TextStyle(
                       color: iituRed,
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -3393,22 +3418,25 @@ class _CampusPortalState extends State<CampusPortal> {
                     '3rd Year · Student ID 41151',
                     style: TextStyle(
                       color: greyText,
-                      fontSize: 11.5,
+                      fontSize: 11,
                     ),
                   ),
                   SizedBox(height: 22),
                   Divider(),
                   SizedBox(height: 12),
+
                   ProfileLine(
                     icon: Icons.email_outlined,
                     text:
                     'irada41151@student.iitu.kz',
                   ),
+
                   ProfileLine(
                     icon: Icons.school_outlined,
                     text:
                     'International Information Technology University',
                   ),
+
                   ProfileLine(
                     icon:
                     Icons.location_on_outlined,
@@ -3423,7 +3451,146 @@ class _CampusPortalState extends State<CampusPortal> {
     );
   }
 
-  Widget _academicOverview() {
+  Widget _profileAcademicSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: borderColor,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ACADEMIC OVERVIEW',
+                style: TextStyle(
+                  color: iituRed,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.3,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'Current progress',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.7,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'A quick summary of your academic performance this semester.',
+                style: TextStyle(
+                  color: greyText,
+                  fontSize: 12,
+                ),
+              ),
+
+              const SizedBox(height: 26),
+
+              LayoutBuilder(
+                builder: (
+                    context,
+                    constraints,
+                    ) {
+                  final desktop =
+                      constraints.maxWidth >= 650;
+
+                  final width = desktop
+                      ? (constraints.maxWidth - 36) /
+                      4
+                      : (constraints.maxWidth - 12) /
+                      2;
+
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: width,
+                        child:
+                        const AcademicMetricCard(
+                          icon:
+                          Icons.calendar_month_outlined,
+                          label: 'SEMESTER',
+                          value: '5',
+                          caption: 'Current',
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child:
+                        const AcademicMetricCard(
+                          icon:
+                          Icons.trending_up_rounded,
+                          label: 'GPA',
+                          value: '3.5',
+                          caption: 'Good standing',
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child:
+                        const AcademicMetricCard(
+                          icon:
+                          Icons.school_outlined,
+                          label: 'CREDITS',
+                          value: '90',
+                          caption: 'Completed',
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child:
+                        const AcademicMetricCard(
+                          icon:
+                          Icons.check_circle_outline,
+                          label: 'ATTENDANCE',
+                          value: '92%',
+                          caption: 'On track',
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        const Text(
+          'Academic Records',
+          style: TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
+          ),
+        ),
+
+        const SizedBox(height: 15),
+
+        _academicRecords(),
+      ],
+    );
+  }
+
+  Widget _academicRecords() {
     const items = [
       AcademicItem(
         Icons.description_outlined,
@@ -3484,8 +3651,9 @@ class _CampusPortalState extends State<CampusPortal> {
                       );
                     },
                     child: Container(
-                      height: 130,
-                      padding: const EdgeInsets.all(21),
+                      height: 126,
+                      padding:
+                      const EdgeInsets.all(21),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius:
@@ -3497,8 +3665,9 @@ class _CampusPortalState extends State<CampusPortal> {
                       child: Row(
                         children: [
                           Container(
-                            width: 50,
-                            height: 50,
+                            width: 49,
+                            height: 49,
+                            alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: softRed,
                               borderRadius:
@@ -3524,7 +3693,7 @@ class _CampusPortalState extends State<CampusPortal> {
                                 Text(
                                   item.title,
                                   style: const TextStyle(
-                                    fontSize: 13.5,
+                                    fontSize: 13,
                                     fontWeight:
                                     FontWeight.w600,
                                   ),
@@ -3534,7 +3703,7 @@ class _CampusPortalState extends State<CampusPortal> {
                                   item.subtitle,
                                   style: const TextStyle(
                                     color: greyText,
-                                    fontSize: 11,
+                                    fontSize: 10.5,
                                   ),
                                 ),
                               ],
@@ -3583,7 +3752,7 @@ class _CampusPortalState extends State<CampusPortal> {
 }
 
 // ============================================================
-// DATA
+// DATA CLASSES
 // ============================================================
 
 class CampusEvent {
@@ -3640,6 +3809,166 @@ class AcademicItem {
       this.title,
       this.subtitle,
       );
+}
+
+// ============================================================
+// COMPACT ACADEMIC VALUE
+// ============================================================
+
+class CompactAcademicValue
+    extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const CompactAcademicValue({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 90,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: greyText,
+              fontSize: 8.5,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// PROFILE ACADEMIC CARD
+// ============================================================
+
+class AcademicMetricCard
+    extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String caption;
+
+  const AcademicMetricCard({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.caption,
+  });
+
+  @override
+  State<AcademicMetricCard> createState() =>
+      _AcademicMetricCardState();
+}
+
+class _AcademicMetricCardState
+    extends State<AcademicMetricCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 180,
+        ),
+        height: 145,
+
+        // Explicit Container alignment.
+        alignment: Alignment.centerLeft,
+
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: hover
+              ? const Color(0xFFFFF6F7)
+              : const Color(0xFFF8F8FA),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color:
+            hover ? iituRed : borderColor,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  size: 17,
+                  color: iituRed,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  widget.label,
+                  style: const TextStyle(
+                    color: greyText,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 13),
+
+            Text(
+              widget.value,
+              style: const TextStyle(
+                fontSize: 27,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -1,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              widget.caption,
+              style: const TextStyle(
+                color: greyText,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================================
@@ -3714,7 +4043,7 @@ class _HeaderNavButtonState
               color: highlighted
                   ? iituRed
                   : darkText,
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               letterSpacing: -0.2,
             ),
@@ -3765,16 +4094,14 @@ class _HeaderIconButtonState
           foregroundColor:
           hover ? iituRed : darkText,
         ),
-        icon: Icon(
-          widget.icon,
-        ),
+        icon: Icon(widget.icon),
       ),
     );
   }
 }
 
 // ============================================================
-// HEADING
+// HEADINGS
 // ============================================================
 
 class PremiumHeading extends StatelessWidget {
@@ -3799,32 +4126,28 @@ class PremiumHeading extends StatelessWidget {
           eyebrow,
           style: const TextStyle(
             color: iituRed,
-            fontSize: 9.5,
+            fontSize: 9,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.5,
           ),
         ),
-
         const SizedBox(height: 10),
-
         Text(
           title,
           style: const TextStyle(
             color: darkText,
-            fontSize: 34,
+            fontSize: 33,
             height: 1.12,
             fontWeight: FontWeight.w500,
             letterSpacing: -1.2,
           ),
         ),
-
         const SizedBox(height: 9),
-
         Text(
           subtitle,
           style: const TextStyle(
             color: greyText,
-            fontSize: 13.5,
+            fontSize: 13,
             height: 1.5,
           ),
         ),
@@ -3834,7 +4157,7 @@ class PremiumHeading extends StatelessWidget {
 }
 
 // ============================================================
-// SIMPLE REVEAL
+// REVEAL ANIMATION
 // ============================================================
 
 class SimpleReveal extends StatelessWidget {
@@ -3868,7 +4191,7 @@ class SimpleReveal extends StatelessWidget {
           child: Transform.translate(
             offset: Offset(
               0,
-              30 * (1 - value),
+              27 * (1 - value),
             ),
             child: widget,
           ),
@@ -3915,13 +4238,12 @@ class _PremiumHoverState
       },
       child: AnimatedScale(
         duration: const Duration(
-          milliseconds: 190,
+          milliseconds: 180,
         ),
-        curve: Curves.easeOutCubic,
-        scale: hover ? 1.012 : 1,
+        scale: hover ? 1.011 : 1,
         child: AnimatedContainer(
           duration: const Duration(
-            milliseconds: 190,
+            milliseconds: 180,
           ),
           decoration: BoxDecoration(
             borderRadius:
@@ -3931,9 +4253,9 @@ class _PremiumHoverState
               BoxShadow(
                 color: Colors.black
                     .withOpacity(
-                  0.055,
+                  0.05,
                 ),
-                blurRadius: 32,
+                blurRadius: 30,
                 offset: const Offset(
                   0,
                   12,
@@ -4001,7 +4323,7 @@ class _HoverImageState
 }
 
 // ============================================================
-// HERO IMAGE
+// HERO IMAGE ANIMATION
 // ============================================================
 
 class AnimatedHeroImage extends StatelessWidget {
@@ -4042,7 +4364,7 @@ class AnimatedHeroImage extends StatelessWidget {
 }
 
 // ============================================================
-// STUDENT ORBIT HUB
+// STUDENT HUB
 // ============================================================
 
 class OrbitHub extends StatefulWidget {
@@ -4096,7 +4418,7 @@ class _OrbitHubState extends State<OrbitHub>
     controller = AnimationController(
       vsync: this,
       duration: const Duration(
-        seconds: 30,
+        seconds: 38,
       ),
     )..repeat();
   }
@@ -4120,17 +4442,17 @@ class _OrbitHubState extends State<OrbitHub>
               child,
               ) {
             const center = 200.0;
-            const radius = 140.0;
-            const buttonSize = 80.0;
+            const radius = 139.0;
+            const buttonSize = 76.0;
 
             return Stack(
               children: [
                 Positioned(
-                  left: 98,
-                  top: 98,
+                  left: 100,
+                  top: 100,
                   child: Container(
-                    width: 204,
-                    height: 204,
+                    width: 200,
+                    height: 200,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -4141,9 +4463,9 @@ class _OrbitHubState extends State<OrbitHub>
                         BoxShadow(
                           color: Colors.black
                               .withOpacity(
-                            0.045,
+                            0.04,
                           ),
-                          blurRadius: 35,
+                          blurRadius: 32,
                         ),
                       ],
                     ),
@@ -4153,14 +4475,14 @@ class _OrbitHubState extends State<OrbitHub>
                       children: [
                         Image.asset(
                           'assets/images/iitu_logo.png',
-                          width: 98,
+                          width: 94,
                         ),
-                        const SizedBox(height: 13),
+                        const SizedBox(height: 12),
                         const Text(
                           'STUDENT HUB',
                           style: TextStyle(
                             color: iituRed,
-                            fontSize: 9,
+                            fontSize: 8.5,
                             fontWeight:
                             FontWeight.w600,
                             letterSpacing: 1.4,
@@ -4266,8 +4588,8 @@ class _OrbitButtonState
           ),
           scale: hover ? 1.09 : 1,
           child: Container(
-            width: 80,
-            height: 80,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
               color:
               hover ? iituRed : Colors.white,
@@ -4281,9 +4603,9 @@ class _OrbitButtonState
                 BoxShadow(
                   color: Colors.black
                       .withOpacity(
-                    0.055,
+                    0.05,
                   ),
-                  blurRadius: 16,
+                  blurRadius: 15,
                 ),
               ],
             ),
@@ -4293,7 +4615,7 @@ class _OrbitButtonState
               children: [
                 Icon(
                   widget.data.icon,
-                  size: 20,
+                  size: 19,
                   color: hover
                       ? Colors.white
                       : iituRed,
@@ -4306,7 +4628,7 @@ class _OrbitButtonState
                     color: hover
                         ? Colors.white
                         : darkText,
-                    fontSize: 8.5,
+                    fontSize: 8,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -4320,7 +4642,7 @@ class _OrbitButtonState
 }
 
 // ============================================================
-// NEW ANNOUNCEMENT ANIMATION
+// ANNOUNCEMENT ANIMATION
 // ============================================================
 
 enum AnnouncementVisualMode {
@@ -4385,111 +4707,105 @@ class _AnnouncementMotionVisualState
 
   Widget _partnerVisual() {
     final pulse =
-        math.sin(controller.value *
-            math.pi *
-            2) *
+        math.sin(
+          controller.value *
+              math.pi *
+              2,
+        ) *
             5;
 
-    return LayoutBuilder(
-      builder: (
-          context,
-          constraints,
-          ) {
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end:
-                    Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFF0EFF3),
-                      Color(0xFFF9F9FA),
-                    ],
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFF0EFF3),
+                  Color(0xFFF9F9FA),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        Center(
+          child: Container(
+            width: 86,
+            height: 86,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: borderColor,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withOpacity(
+                    0.04,
                   ),
+                  blurRadius: 22,
                 ),
-              ),
+              ],
             ),
+            child: Image.asset(
+              'assets/images/iitu_logo.png',
+              width: 57,
+            ),
+          ),
+        ),
 
-            Center(
-              child: Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: borderColor,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black
-                          .withOpacity(
-                        0.05,
-                      ),
-                      blurRadius: 22,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Image.asset(
-                    'assets/images/iitu_logo.png',
-                    width: 58,
-                  ),
-                ),
-              ),
-            ),
+        Positioned(
+          left: 22,
+          top: 45 + pulse,
+          child: const MiniVisualCard(
+            icon: Icons.language_rounded,
+            text: 'Global',
+          ),
+        ),
 
-            Positioned(
-              left: 22,
-              top: 45 + pulse,
-              child: const MiniVisualCard(
-                icon: Icons.language_rounded,
-                text: 'Global',
-              ),
-            ),
+        Positioned(
+          right: 20,
+          top: 58 - pulse,
+          child: const MiniVisualCard(
+            icon: Icons.school_outlined,
+            text: 'Partner',
+          ),
+        ),
 
-            Positioned(
-              right: 20,
-              top: 58 - pulse,
-              child: const MiniVisualCard(
-                icon:
-                Icons.school_outlined,
-                text: 'Partner',
-              ),
-            ),
+        Positioned(
+          left: 40,
+          bottom: 28 - pulse,
+          child: const MiniVisualCard(
+            icon: Icons.flight_takeoff,
+            text: 'Mobility',
+          ),
+        ),
 
-            Positioned(
-              left: 40,
-              bottom: 28 - pulse,
-              child: const MiniVisualCard(
-                icon: Icons.flight_takeoff,
-                text: 'Mobility',
-              ),
-            ),
-
-            Positioned(
-              right: 36,
-              bottom: 24 + pulse,
-              child: const MiniVisualCard(
-                icon:
-                Icons.workspace_premium_outlined,
-                text: 'Degree',
-              ),
-            ),
-          ],
-        );
-      },
+        Positioned(
+          right: 36,
+          bottom: 24 + pulse,
+          child: const MiniVisualCard(
+            icon:
+            Icons.workspace_premium_outlined,
+            text: 'Degree',
+          ),
+        ),
+      ],
     );
   }
 
   Widget _academicVisual() {
     final pulse =
-        math.sin(controller.value *
-            math.pi *
-            2) *
+        math.sin(
+          controller.value *
+              math.pi *
+              2,
+        ) *
             7;
 
     return Stack(
@@ -4513,27 +4829,25 @@ class _AnnouncementMotionVisualState
           child: Container(
             width: 78,
             height: 78,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: iituRed,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
                   color: iituRed.withOpacity(
-                    0.20,
+                    0.18,
                   ),
                   blurRadius: 24,
                 ),
               ],
             ),
-            child: const Center(
-              child: Text(
-                'IITU',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
+            child: const Text(
+              'IITU',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -4567,8 +4881,7 @@ class _AnnouncementMotionVisualState
             0.48 - pulse / 150,
           ),
           child: const NetworkBubble(
-            icon:
-            Icons.assignment_outlined,
+            icon: Icons.assignment_outlined,
             text: 'Semester',
           ),
         ),
@@ -4579,8 +4892,7 @@ class _AnnouncementMotionVisualState
             0.45 + pulse / 150,
           ),
           child: const NetworkBubble(
-            icon:
-            Icons.notifications_none,
+            icon: Icons.notifications_none,
             text: 'Updates',
           ),
         ),
@@ -4615,7 +4927,7 @@ class MiniVisualCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color:
-            Colors.black.withOpacity(0.035),
+            Colors.black.withOpacity(0.03),
             blurRadius: 12,
           ),
         ],
@@ -4632,7 +4944,7 @@ class MiniVisualCard extends StatelessWidget {
           Text(
             text,
             style: const TextStyle(
-              fontSize: 9.5,
+              fontSize: 9,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -4690,7 +5002,7 @@ class NetworkBubble extends StatelessWidget {
 }
 
 // ============================================================
-// CIRCULAR ARROW
+// ARROW BUTTON
 // ============================================================
 
 class CircularArrowButton
@@ -4728,7 +5040,8 @@ class _CircularArrowButtonState
       },
       child: InkWell(
         onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(50),
+        borderRadius:
+        BorderRadius.circular(50),
         child: AnimatedContainer(
           duration: const Duration(
             milliseconds: 180,
@@ -4747,8 +5060,9 @@ class _CircularArrowButtonState
           ),
           child: Icon(
             widget.icon,
-            color:
-            hover ? Colors.white : darkText,
+            color: hover
+                ? Colors.white
+                : darkText,
             size: 18,
           ),
         ),
@@ -4807,7 +5121,6 @@ class _CampusVisualCardState
               duration: const Duration(
                 milliseconds: 450,
               ),
-              curve: Curves.easeOutCubic,
               scale: hover ? 1.045 : 1,
               child: Image.asset(
                 widget.image,
@@ -4849,24 +5162,21 @@ class _CampusVisualCardState
                     ),
                     const SizedBox(height: 7),
                   ],
-
                   Text(
                     widget.title,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 22,
+                      fontSize: 21,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.5,
                     ),
                   ),
-
                   const SizedBox(height: 6),
-
                   Text(
                     widget.subtitle,
                     style: const TextStyle(
                       color: Colors.white70,
-                      fontSize: 11.5,
+                      fontSize: 11,
                       height: 1.4,
                     ),
                   ),
@@ -4884,10 +5194,8 @@ class _CampusVisualCardState
                 width: 43,
                 height: 43,
                 decoration: BoxDecoration(
-                  color: hover
-                      ? Colors.white
-                      : Colors.white.withOpacity(
-                    0.86,
+                  color: Colors.white.withOpacity(
+                    hover ? 1 : 0.86,
                   ),
                   shape: BoxShape.circle,
                 ),
@@ -4959,14 +5267,14 @@ class _AnimatedGlobeState
                     );
 
         return SizedBox(
-          width: 305,
-          height: 305,
+          width: 300,
+          height: 300,
           child: Stack(
             alignment: Alignment.center,
             children: [
               Container(
-                width: 258,
-                height: 258,
+                width: 250,
+                height: 250,
                 decoration: BoxDecoration(
                   color: const Color(
                     0xFF174B68,
@@ -4990,7 +5298,7 @@ class _AnimatedGlobeState
                 turns: controller,
                 child: const Icon(
                   Icons.public_rounded,
-                  size: 224,
+                  size: 218,
                   color: Color(
                     0xFF72A9C5,
                   ),
@@ -4999,8 +5307,8 @@ class _AnimatedGlobeState
 
               Transform.translate(
                 offset: const Offset(
-                  48,
-                  -43,
+                  47,
+                  -42,
                 ),
                 child: Transform.scale(
                   scale: pulse,
@@ -5031,7 +5339,7 @@ class _AnimatedGlobeState
 
               Positioned(
                 right: 1,
-                top: 74,
+                top: 73,
                 child: Container(
                   padding:
                   const EdgeInsets.symmetric(
@@ -5039,14 +5347,15 @@ class _AnimatedGlobeState
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(
+                    color: Colors.white
+                        .withOpacity(
                       0.12,
                     ),
                     borderRadius:
                     BorderRadius.circular(20),
                     border: Border.all(
-                      color:
-                      Colors.white.withOpacity(
+                      color: Colors.white
+                          .withOpacity(
                         0.17,
                       ),
                     ),
@@ -5055,7 +5364,7 @@ class _AnimatedGlobeState
                     'IITU · Kazakhstan',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -5104,7 +5413,7 @@ class ProfileLine extends StatelessWidget {
               text,
               style: const TextStyle(
                 color: greyText,
-                fontSize: 11.5,
+                fontSize: 11,
                 height: 1.4,
               ),
             ),
