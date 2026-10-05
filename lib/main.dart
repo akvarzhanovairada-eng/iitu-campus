@@ -15,17 +15,18 @@ void main() {
 const Color iituRed = Color(0xFFB71930);
 const Color iituDarkRed = Color(0xFF7D1020);
 
-const Color darkText = Color(0xFF1C1D21);
-const Color greyText = Color(0xFF74777E);
+const Color darkText = Color(0xFF1B1C20);
+const Color greyText = Color(0xFF73767D);
 
 const Color pageBackground = Color(0xFFF8F8FA);
-const Color cardBackground = Color(0xFFFFFFFF);
-const Color softRed = Color(0xFFFCECEF);
 const Color softGrey = Color(0xFFF2F2F5);
-const Color borderColor = Color(0xFFE7E7EB);
+const Color softRed = Color(0xFFFCECEF);
+const Color borderColor = Color(0xFFE6E6EA);
 
 const Color navy = Color(0xFF071D2C);
 const Color navyLight = Color(0xFF123A52);
+
+const Color successGreen = Color(0xFF268A5B);
 
 // ============================================================
 // APP
@@ -58,24 +59,46 @@ class IITUCampusApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFF4F4F6),
+          fillColor: const Color(0xFFF5F5F7),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
-            vertical: 16,
+            vertical: 17,
+          ),
+          hintStyle: const TextStyle(
+            color: Color(0xFF9A9CA3),
+            fontSize: 13,
+          ),
+          labelStyle: const TextStyle(
+            color: greyText,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(17),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(17),
+            borderSide: const BorderSide(
+              color: borderColor,
+            ),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(17),
             borderSide: const BorderSide(
               color: iituRed,
-              width: 1.3,
+              width: 1.4,
+            ),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: const BorderSide(
+              color: iituRed,
+            ),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: const BorderSide(
+              color: iituRed,
+              width: 1.4,
             ),
           ),
         ),
@@ -98,45 +121,73 @@ class CampusPortal extends StatefulWidget {
 
 class _CampusPortalState extends State<CampusPortal> {
   int _pageIndex = 0;
+
   int _floor = 1;
   int _selectedPlace = 0;
+
   int _eventIndex = 0;
 
-  final Set<int> _registeredEvents = {};
-  final List<ReminderItem> _reminders = [];
-
   Timer? _eventTimer;
+
+  ServiceRequestSummary? _lastServiceRequest;
 
   final List<CampusEvent> events = const [
     CampusEvent(
       title: 'Almaty Student Hackathon',
       category: 'Hackathon',
       date: '12 OCT',
-      time: '10:00 AM',
+      fullDate: '12 October 2026',
+      time: '10:00 AM – 6:00 PM',
       location: 'Almaty',
       description:
-      'Join students and developers to build innovative digital solutions in teams.',
+      'Join students and young developers to build innovative digital solutions in teams.',
+      longDescription:
+      'The Almaty Student Hackathon brings together students from technology, design and business backgrounds. Participants work in teams, solve a real challenge, receive mentorship and present their final solution to a jury.',
       image: 'assets/images/event_hackathon.jpg',
+      expectations: [
+        'Team-based innovation challenge',
+        'Mentoring from industry specialists',
+        'Networking with students and companies',
+        'Final project presentation',
+      ],
     ),
     CampusEvent(
       title: 'Cybersecurity Workshop',
       category: 'Workshop',
       date: '18 OCT',
-      time: '2:00 PM',
+      fullDate: '18 October 2026',
+      time: '2:00 PM – 5:00 PM',
       location: 'IITU Campus',
       description:
-      'A practical session focused on cybersecurity, networks and modern digital security tools.',
+      'A practical workshop focused on cybersecurity, networks and modern digital security tools.',
+      longDescription:
+      'This workshop introduces practical cybersecurity scenarios and tools. Students will work with network-security concepts, analyze common risks and discuss how modern systems can be protected.',
       image: 'assets/images/event_cybersecurity.jpg',
+      expectations: [
+        'Practical cybersecurity exercises',
+        'Network-security demonstrations',
+        'Discussion of real security risks',
+        'Q&A with the workshop team',
+      ],
     ),
     CampusEvent(
       title: 'Career & Internship Fair',
       category: 'Career',
       date: '24 OCT',
-      time: '11:00 AM',
-      location: 'Main Hall',
+      fullDate: '24 October 2026',
+      time: '11:00 AM – 4:00 PM',
+      location: 'IITU Main Hall',
       description:
       'Meet companies and explore internships, projects and future career opportunities.',
+      longDescription:
+      'The Career & Internship Fair connects IITU students with employers, internship programmes and graduate opportunities. Students can learn about companies, ask questions and build professional connections.',
       image: 'assets/images/event_career.jpg',
+      expectations: [
+        'Meet recruiters and company representatives',
+        'Explore internships and graduate roles',
+        'Ask questions about career pathways',
+        'Build professional connections',
+      ],
     ),
   ];
 
@@ -145,7 +196,7 @@ class _CampusPortalState extends State<CampusPortal> {
     super.initState();
 
     _eventTimer = Timer.periodic(
-      const Duration(seconds: 6),
+      const Duration(seconds: 7),
           (_) {
         if (!mounted) return;
 
@@ -165,7 +216,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // ACTIONS
+  // BASIC ACTIONS
   // ============================================================
 
   void _changePage(int index) {
@@ -190,43 +241,27 @@ class _CampusPortalState extends State<CampusPortal> {
     );
   }
 
-  void _registerEvent(int index) {
-    setState(() {
-      _registeredEvents.add(index);
-    });
-
-    _showMessage(
-      '${events[index].title} registered successfully!',
+  void _openEvent(CampusEvent event) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventDetailsPage(
+          event: event,
+        ),
+      ),
     );
   }
 
-  // ============================================================
-  // CALENDAR / REMINDERS
-  // ============================================================
+  void _showLastRequest() {
+    final request = _lastServiceRequest;
 
-  Future<void> _openCalendar() async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2026, 1, 1),
-      lastDate: DateTime(2028, 12, 31),
-      helpText: 'Select reminder date',
-      confirmText: 'Select',
-    );
-
-    if (selected != null && mounted) {
-      await _openReminderDialog(selected);
+    if (request == null) {
+      _showMessage(
+        'You do not have a submitted service request yet.',
+      );
+      return;
     }
-  }
 
-  Future<void> _openReminderDialog([
-    DateTime? initialDate,
-  ]) async {
-    final controller = TextEditingController();
-
-    final date = initialDate ?? DateTime.now();
-
-    final result = await showDialog<String>(
+    showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -235,46 +270,62 @@ class _CampusPortalState extends State<CampusPortal> {
             borderRadius: BorderRadius.circular(26),
           ),
           title: const Text(
-            'Create Reminder',
+            'Latest Request',
             style: TextStyle(
-              fontSize: 21,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.5,
             ),
           ),
           content: SizedBox(
-            width: 400,
+            width: 430,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: softRed,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    _prettyDate(date),
-                    style: const TextStyle(
-                      color: iituRed,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                _summaryRow(
+                  'Reference',
+                  request.reference,
                 ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Example: Machine Learning assignment',
-                    prefixIcon: Icon(
-                      Icons.edit_note_outlined,
-                    ),
+                _summaryRow(
+                  'Issue',
+                  request.category,
+                ),
+                _summaryRow(
+                  'Urgency',
+                  request.urgency,
+                ),
+                _summaryRow(
+                  'Contact',
+                  request.contactMethod,
+                ),
+                _summaryRow(
+                  'Preferred date',
+                  request.preferredDate,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF7F0),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.schedule_rounded,
+                        color: successGreen,
+                        size: 19,
+                      ),
+                      SizedBox(width: 9),
+                      Text(
+                        'Status: Submitted',
+                        style: TextStyle(
+                          color: successGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -285,89 +336,70 @@ class _CampusPortalState extends State<CampusPortal> {
               onPressed: () {
                 Navigator.pop(dialogContext);
               },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final text = controller.text.trim();
-
-                if (text.isNotEmpty) {
-                  Navigator.pop(
-                    dialogContext,
-                    text,
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: iituRed,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Add Reminder'),
+              child: const Text('Close'),
             ),
           ],
         );
       },
     );
+  }
 
-    controller.dispose();
-
-    if (result == null || !mounted) return;
-
-    setState(() {
-      _reminders.add(
-        ReminderItem(
-          title: result,
-          date: date,
-        ),
-      );
-    });
-
-    _showMessage(
-      'Reminder added for ${_prettyDate(date)}',
+  Widget _summaryRow(
+      String label,
+      String value,
+      ) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: 13,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: greyText,
+                fontSize: 11.5,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  String _prettyDate(DateTime date) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-
   // ============================================================
-  // BUILD
+  // MAIN BUILD
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final desktop = width >= 900;
+
+    final desktop = width >= 920;
 
     return Scaffold(
       appBar: _buildAppBar(desktop),
 
-      drawer: _buildDrawer(),
+      drawer: desktop ? null : _buildDrawer(),
 
-      // SafeArea is intentionally used to satisfy the
-      // project requirement and protect the content
-      // from device system areas.
       body: SafeArea(
         top: false,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 350),
+          duration: const Duration(
+            milliseconds: 350,
+          ),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
           child: KeyedSubtree(
@@ -377,25 +409,6 @@ class _CampusPortalState extends State<CampusPortal> {
         ),
       ),
 
-      // Mobile only
-      floatingActionButton: desktop
-          ? null
-          : FloatingActionButton.extended(
-        onPressed: _openReminderDialog,
-        backgroundColor: iituRed,
-        foregroundColor: Colors.white,
-        icon: const Icon(
-          Icons.notifications_none_rounded,
-        ),
-        label: const Text(
-          'Reminder',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-
-      // Mobile only
       bottomNavigationBar: desktop
           ? null
           : BottomNavigationBar(
@@ -404,26 +417,53 @@ class _CampusPortalState extends State<CampusPortal> {
         backgroundColor: Colors.white,
         selectedItemColor: iituRed,
         unselectedItemColor: Colors.grey,
+        selectedFontSize: 10,
+        unselectedFontSize: 10,
         onTap: _changePage,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
+            icon: Icon(
+              Icons.home_outlined,
+            ),
+            activeIcon: Icon(
+              Icons.home_rounded,
+            ),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.event_outlined),
-            activeIcon: Icon(Icons.event),
+            icon: Icon(
+              Icons.event_outlined,
+            ),
+            activeIcon: Icon(
+              Icons.event_rounded,
+            ),
             label: 'Events',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map_outlined),
-            activeIcon: Icon(Icons.map),
+            icon: Icon(
+              Icons.map_outlined,
+            ),
+            activeIcon: Icon(
+              Icons.map_rounded,
+            ),
             label: 'Campus',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+            icon: Icon(
+              Icons.support_agent_outlined,
+            ),
+            activeIcon: Icon(
+              Icons.support_agent_rounded,
+            ),
+            label: 'Services',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.person_outline,
+            ),
+            activeIcon: Icon(
+              Icons.person,
+            ),
             label: 'Profile',
           ),
         ],
@@ -440,6 +480,16 @@ class _CampusPortalState extends State<CampusPortal> {
         return _campusPage();
 
       case 3:
+        return StudentServicesPage(
+          lastRequest: _lastServiceRequest,
+          onSubmitted: (request) {
+            setState(() {
+              _lastServiceRequest = request;
+            });
+          },
+        );
+
+      case 4:
         return _profilePage();
 
       default:
@@ -448,14 +498,15 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // HEADER
+  // APP BAR
   // ============================================================
 
   PreferredSizeWidget _buildAppBar(
       bool desktop,
       ) {
     return AppBar(
-      toolbarHeight: desktop ? 76 : 68,
+      automaticallyImplyLeading: !desktop,
+      toolbarHeight: desktop ? 78 : 68,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       foregroundColor: darkText,
@@ -464,10 +515,10 @@ class _CampusPortalState extends State<CampusPortal> {
       title: Row(
         children: [
           SizedBox(
-            width: desktop ? 145 : 115,
-            height: 42,
-            child: Image.asset(
-              'assets/images/iitu_logo.png',
+            width: desktop ? 145 : 112,
+            height: 43,
+            child: AppImage(
+              path: 'assets/images/iitu_logo.png',
               fit: BoxFit.contain,
               alignment: Alignment.centerLeft,
             ),
@@ -495,9 +546,15 @@ class _CampusPortalState extends State<CampusPortal> {
             ),
 
             HeaderNavButton(
-              label: 'Profile',
+              label: 'Services',
               active: _pageIndex == 3,
               onTap: () => _changePage(3),
+            ),
+
+            HeaderNavButton(
+              label: 'Profile',
+              active: _pageIndex == 4,
+              onTap: () => _changePage(4),
             ),
           ],
         ],
@@ -507,7 +564,9 @@ class _CampusPortalState extends State<CampusPortal> {
         HeaderIconButton(
           icon: Icons.search_rounded,
           onTap: () {
-            _showMessage('Search selected.');
+            _showMessage(
+              'Search selected.',
+            );
           },
         ),
 
@@ -523,11 +582,14 @@ class _CampusPortalState extends State<CampusPortal> {
         const SizedBox(width: 8),
 
         GestureDetector(
-          onTap: () => _changePage(3),
+          onTap: () => _changePage(4),
           child: const Padding(
-            padding: EdgeInsets.only(right: 18),
+            padding: EdgeInsets.only(
+              right: 18,
+            ),
             child: CircleAvatar(
               radius: 21,
+              backgroundColor: softRed,
               backgroundImage: AssetImage(
                 'assets/images/profile_irada.png',
               ),
@@ -561,7 +623,7 @@ class _CampusPortalState extends State<CampusPortal> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 31,
+                  radius: 30,
                   backgroundImage: AssetImage(
                     'assets/images/profile_irada.png',
                   ),
@@ -571,7 +633,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   'Akvarzhanova Irada',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -580,7 +642,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   'Network Security • 3rd Year',
                   style: TextStyle(
                     color: Colors.white70,
-                    fontSize: 12,
+                    fontSize: 11.5,
                   ),
                 ),
               ],
@@ -588,74 +650,33 @@ class _CampusPortalState extends State<CampusPortal> {
           ),
 
           _drawerItem(
-            Icons.person_outline,
-            'My Profile',
-                () {
-              Navigator.pop(context);
-              _changePage(3);
-            },
+            Icons.home_outlined,
+            'Home',
+            0,
           ),
 
           _drawerItem(
-            Icons.menu_book_outlined,
-            'My Courses',
-                () {
-              Navigator.pop(context);
-              _showMessage('My Courses selected.');
-            },
-          ),
-
-          _drawerItem(
-            Icons.calendar_month_outlined,
-            'Calendar',
-                () {
-              Navigator.pop(context);
-              _openCalendar();
-            },
+            Icons.event_outlined,
+            'Events',
+            1,
           ),
 
           _drawerItem(
             Icons.map_outlined,
             'Campus Map',
-                () {
-              Navigator.pop(context);
-              _changePage(2);
-            },
+            2,
           ),
 
           _drawerItem(
             Icons.support_agent_outlined,
             'Student Services',
-                () {
-              Navigator.pop(context);
-              _showMessage(
-                'Student Services selected.',
-              );
-            },
-          ),
-
-          const Divider(),
-
-          _drawerItem(
-            Icons.settings_outlined,
-            'Settings',
-                () {
-              Navigator.pop(context);
-              _showMessage('Settings selected.');
-            },
-            red: false,
+            3,
           ),
 
           _drawerItem(
-            Icons.info_outline,
-            'About IITU',
-                () {
-              Navigator.pop(context);
-              _showMessage(
-                'International Information Technology University',
-              );
-            },
-            red: false,
+            Icons.person_outline,
+            'My Profile',
+            4,
           ),
         ],
       ),
@@ -665,21 +686,23 @@ class _CampusPortalState extends State<CampusPortal> {
   Widget _drawerItem(
       IconData icon,
       String title,
-      VoidCallback onTap, {
-        bool red = true,
-      }) {
+      int page,
+      ) {
     return ListTile(
       leading: Icon(
         icon,
-        color: red ? iituRed : greyText,
+        color: iituRed,
       ),
       title: Text(title),
-      onTap: onTap,
+      onTap: () {
+        Navigator.pop(context);
+        _changePage(page);
+      },
     );
   }
 
   // ============================================================
-  // HOME
+  // HOME PAGE
   // ============================================================
 
   Widget _homePage() {
@@ -691,45 +714,59 @@ class _CampusPortalState extends State<CampusPortal> {
           _maxWidth(
             child: Column(
               children: [
-                const SizedBox(height: 55),
+                const SizedBox(height: 58),
 
                 SimpleReveal(
                   delay: 60,
-                  child: _homeWelcomeStrip(),
+                  child: _homeAcademicStrip(),
                 ),
 
-                const SizedBox(height: 95),
+                const SizedBox(height: 105),
 
                 SimpleReveal(
                   delay: 120,
                   child: _studentHubSection(),
                 ),
 
-                const SizedBox(height: 110),
+                const SizedBox(height: 115),
 
                 SimpleReveal(
                   delay: 180,
-                  child: _announcementSection(),
+                  child: StudentSupportPromo(
+                    hasRequest:
+                    _lastServiceRequest != null,
+                    onOpenServices: () {
+                      _changePage(3);
+                    },
+                    onOpenStatus: _showLastRequest,
+                  ),
                 ),
 
-                const SizedBox(height: 110),
+                const SizedBox(height: 115),
 
                 SimpleReveal(
                   delay: 240,
-                  child: _eventsShowcase(),
+                  child: _announcementSection(),
                 ),
 
-                const SizedBox(height: 110),
+                const SizedBox(height: 115),
 
                 SimpleReveal(
                   delay: 300,
-                  child: _campusLifeSection(),
+                  child: _eventsShowcase(),
                 ),
 
-                const SizedBox(height: 110),
+                const SizedBox(height: 115),
 
                 SimpleReveal(
                   delay: 360,
+                  child: _campusLifeSection(),
+                ),
+
+                const SizedBox(height: 115),
+
+                SimpleReveal(
+                  delay: 420,
                   child: _globalFooter(),
                 ),
 
@@ -739,12 +776,11 @@ class _CampusPortalState extends State<CampusPortal> {
                   'IITU Campus • Student Portal Concept • 2026',
                   style: TextStyle(
                     color: greyText,
-                    fontSize: 11,
-                    letterSpacing: 0.2,
+                    fontSize: 10.5,
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 42),
               ],
             ),
           ),
@@ -771,13 +807,15 @@ class _CampusPortalState extends State<CampusPortal> {
             color: Colors.white,
             child: Column(
               children: [
-                _heroText(),
+                _heroText(
+                  mobile: true,
+                ),
                 SizedBox(
                   height: 330,
                   width: double.infinity,
-                  child: Image.asset(
+                  child: AnimatedHeroImage(
+                    image:
                     'assets/images/hero_campus.png',
-                    fit: BoxFit.cover,
                   ),
                 ),
               ],
@@ -786,7 +824,7 @@ class _CampusPortalState extends State<CampusPortal> {
         }
 
         return SizedBox(
-          height: 585,
+          height: 625,
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,
@@ -803,14 +841,14 @@ class _CampusPortalState extends State<CampusPortal> {
                     end: Alignment.centerRight,
                     colors: [
                       Colors.white,
-                      Colors.white.withOpacity(0.98),
-                      Colors.white.withOpacity(0.78),
-                      Colors.white.withOpacity(0.03),
+                      Colors.white.withOpacity(0.99),
+                      Colors.white.withOpacity(0.82),
+                      Colors.white.withOpacity(0.15),
                     ],
                     stops: const [
                       0,
-                      0.28,
-                      0.57,
+                      0.30,
+                      0.59,
                       1,
                     ],
                   ),
@@ -820,7 +858,7 @@ class _CampusPortalState extends State<CampusPortal> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: 650,
+                  width: 700,
                   child: _heroText(),
                 ),
               ),
@@ -831,42 +869,21 @@ class _CampusPortalState extends State<CampusPortal> {
     );
   }
 
-  Widget _heroText() {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(
-        begin: 0,
-        end: 1,
+  Widget _heroText({
+    bool mobile = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: mobile ? 25 : 52,
+        vertical: mobile ? 48 : 55,
       ),
-      duration: const Duration(
-        milliseconds: 850,
-      ),
-      curve: Curves.easeOutCubic,
-      builder: (
-          context,
-          value,
-          child,
-          ) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(
-              0,
-              25 * (1 - value),
-            ),
-            child: child,
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 46,
-          vertical: 50,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RevealAfterDelay(
+            delay: 60,
+            child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 8,
@@ -886,57 +903,72 @@ class _CampusPortalState extends State<CampusPortal> {
                     color: iituRed,
                   ),
                   SizedBox(width: 7),
-                  Text(
-                    'INTERNATIONAL INFORMATION TECHNOLOGY UNIVERSITY',
-                    style: TextStyle(
-                      color: iituRed,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.75,
+                  Flexible(
+                    child: Text(
+                      'INTERNATIONAL INFORMATION TECHNOLOGY UNIVERSITY',
+                      style: TextStyle(
+                        color: iituRed,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 29),
+          const SizedBox(height: 29),
 
-            const Text(
+          RevealAfterDelay(
+            delay: 160,
+            child: Text(
               'Your Campus.\nYour Future.\nYour IITU.',
               style: TextStyle(
                 color: darkText,
-                fontSize: 53,
-                height: 1.05,
-                letterSpacing: -2.4,
+                fontSize: mobile ? 43 : 59,
+                height: 1.03,
+                letterSpacing: mobile ? -1.8 : -2.8,
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ),
 
-            const SizedBox(height: 22),
+          const SizedBox(height: 23),
 
-            const SizedBox(
-              width: 510,
+          RevealAfterDelay(
+            delay: 260,
+            child: SizedBox(
+              width: 520,
               child: Text(
                 'A smarter way to explore academic life, student services, events and opportunities at IITU.',
                 style: TextStyle(
-                  color: Color(0xFF686B72),
-                  fontSize: 15.5,
+                  color: const Color(
+                    0xFF60636A,
+                  ),
+                  fontSize: mobile ? 14 : 16.5,
                   height: 1.65,
                   fontWeight: FontWeight.w400,
                 ),
               ),
             ),
+          ),
 
-            const SizedBox(height: 30),
+          const SizedBox(height: 31),
 
-            ElevatedButton.icon(
-              onPressed: () => _changePage(2),
+          RevealAfterDelay(
+            delay: 360,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                _changePage(2);
+              },
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor: iituRed,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
+                  horizontal: 25,
                   vertical: 17,
                 ),
                 shape: RoundedRectangleBorder(
@@ -956,39 +988,39 @@ class _CampusPortalState extends State<CampusPortal> {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   // ============================================================
-  // HOME GREETING + COMPACT ACADEMIC SUMMARY
+  // ACADEMIC STRIP
   // ============================================================
 
-  Widget _homeWelcomeStrip() {
+  Widget _homeAcademicStrip() {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(
         vertical: 4,
       ),
       padding: const EdgeInsets.symmetric(
-        horizontal: 28,
-        vertical: 24,
+        horizontal: 29,
+        vertical: 25,
       ),
 
-      // Explicit alignment for the Container-widget rubric.
+      // Explicit Container alignment for the Container assignment.
       alignment: Alignment.centerLeft,
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(27),
         border: Border.all(
           color: borderColor,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.025),
+            color: Colors.black.withOpacity(0.024),
             blurRadius: 25,
             offset: const Offset(0, 10),
           ),
@@ -1002,19 +1034,19 @@ class _CampusPortalState extends State<CampusPortal> {
           final desktop =
               constraints.maxWidth >= 820;
 
-          final greeting = Column(
+          final greeting = const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Good morning, Irada.',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: -0.6,
+                  letterSpacing: -0.7,
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
+              SizedBox(height: 6),
+              Text(
                 'Here’s your academic overview for today.',
                 style: TextStyle(
                   color: greyText,
@@ -1024,10 +1056,10 @@ class _CampusPortalState extends State<CampusPortal> {
             ],
           );
 
-          final indicators = Wrap(
-            spacing: 26,
+          const indicators = Wrap(
+            spacing: 24,
             runSpacing: 16,
-            children: const [
+            children: [
               CompactAcademicValue(
                 label: 'SEMESTER',
                 value: '5',
@@ -1049,8 +1081,7 @@ class _CampusPortalState extends State<CampusPortal> {
 
           if (!desktop) {
             return Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 greeting,
                 const SizedBox(height: 25),
@@ -1085,10 +1116,10 @@ class _CampusPortalState extends State<CampusPortal> {
           eyebrow: 'STUDENT SPACE',
           title: 'Everything you need, around you.',
           subtitle:
-          'Access your university tools and manage your day without leaving the portal.',
+          'Access university tools and manage your day without leaving the portal.',
         ),
 
-        const SizedBox(height: 40),
+        const SizedBox(height: 42),
 
         LayoutBuilder(
           builder: (
@@ -1102,12 +1133,16 @@ class _CampusPortalState extends State<CampusPortal> {
               onSelect: (
                   value,
                   ) {
-                if (value == 'Calendar') {
-                  _openCalendar();
-                } else if (value == 'Campus') {
+                if (value == 'Campus') {
                   _changePage(2);
                 } else if (value == 'Events') {
                   _changePage(1);
+                } else if (value == 'Services') {
+                  _changePage(3);
+                } else if (value == 'Calendar') {
+                  _showMessage(
+                    'Calendar selected.',
+                  );
                 } else {
                   _showMessage(
                     '$value selected.',
@@ -1122,7 +1157,7 @@ class _CampusPortalState extends State<CampusPortal> {
               return Column(
                 children: [
                   hub,
-                  const SizedBox(height: 38),
+                  const SizedBox(height: 40),
                   today,
                 ],
               );
@@ -1133,7 +1168,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 Expanded(
                   child: hub,
                 ),
-                const SizedBox(width: 60),
+                const SizedBox(width: 62),
                 SizedBox(
                   width: 390,
                   child: today,
@@ -1158,7 +1193,7 @@ class _CampusPortalState extends State<CampusPortal> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
-            blurRadius: 26,
+            blurRadius: 28,
             offset: const Offset(0, 12),
           ),
         ],
@@ -1180,7 +1215,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       color: iituRed,
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 1.3,
+                      letterSpacing: 1.4,
                     ),
                   ),
                   SizedBox(height: 5),
@@ -1209,12 +1244,14 @@ class _CampusPortalState extends State<CampusPortal> {
             'Room 304',
             true,
           ),
+
           _todayClass(
             '11:00',
             'Cloud Computing',
             'Lab 212',
             false,
           ),
+
           _todayClass(
             '14:00',
             'Machine Learning',
@@ -1222,75 +1259,31 @@ class _CampusPortalState extends State<CampusPortal> {
             false,
           ),
 
-          if (_reminders.isNotEmpty)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(
-                top: 2,
-                bottom: 17,
-              ),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: softRed,
-                borderRadius: BorderRadius.circular(
-                  15,
+          const SizedBox(height: 6),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                _changePage(3);
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: iituRed,
+                side: const BorderSide(
+                  color: Color(0xFFEAC1C8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
                 ),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.notifications_active_outlined,
-                    color: iituRed,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _reminders.last.title,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+              icon: const Icon(
+                Icons.support_agent_outlined,
+                size: 17,
+              ),
+              label: const Text(
+                'Need help?',
               ),
             ),
-
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _openReminderDialog,
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: iituRed,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.add_alert_outlined,
-                    size: 17,
-                  ),
-                  label: const Text('Reminder'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              IconButton(
-                tooltip: 'Open Calendar',
-                onPressed: _openCalendar,
-                style: IconButton.styleFrom(
-                  backgroundColor: softRed,
-                  foregroundColor: iituRed,
-                  padding: const EdgeInsets.all(14),
-                ),
-                icon: const Icon(
-                  Icons.calendar_month_outlined,
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -1305,7 +1298,7 @@ class _CampusPortalState extends State<CampusPortal> {
       ) {
     return Padding(
       padding: const EdgeInsets.only(
-        bottom: 17,
+        bottom: 18,
       ),
       child: Row(
         children: [
@@ -1321,6 +1314,7 @@ class _CampusPortalState extends State<CampusPortal> {
               ),
             ),
           ),
+
           Container(
             width: 3,
             height: 38,
@@ -1333,6 +1327,7 @@ class _CampusPortalState extends State<CampusPortal> {
               borderRadius: BorderRadius.circular(5),
             ),
           ),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -1403,15 +1398,18 @@ class _CampusPortalState extends State<CampusPortal> {
               children: [
                 SizedBox(
                   width: cardWidth,
-                  child: _doubleDegreeAnnouncement(),
+                  child:
+                  _doubleDegreeAnnouncement(),
                 ),
                 SizedBox(
                   width: cardWidth,
-                  child: _hackathonAnnouncement(),
+                  child:
+                  _hackathonAnnouncement(),
                 ),
                 SizedBox(
                   width: cardWidth,
-                  child: _academicAnnouncement(),
+                  child:
+                  _academicAnnouncement(),
                 ),
               ],
             );
@@ -1437,7 +1435,8 @@ class _CampusPortalState extends State<CampusPortal> {
           children: [
             const Expanded(
               child: AnnouncementMotionVisual(
-                mode: AnnouncementVisualMode.partner,
+                mode:
+                AnnouncementVisualMode.partner,
               ),
             ),
 
@@ -1480,7 +1479,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 13),
                   TextButton.icon(
                     onPressed: () {
                       _showMessage(
@@ -1495,8 +1494,9 @@ class _CampusPortalState extends State<CampusPortal> {
                       Icons.arrow_forward,
                       size: 15,
                     ),
-                    label:
-                    const Text('Explore programs'),
+                    label: const Text(
+                      'Explore programs',
+                    ),
                   ),
                 ],
               ),
@@ -1509,101 +1509,102 @@ class _CampusPortalState extends State<CampusPortal> {
 
   Widget _hackathonAnnouncement() {
     return PremiumHover(
-      child: Container(
-        height: 420,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: borderColor,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 235,
-              width: double.infinity,
-              child: HoverImage(
-                image:
-                'assets/images/event_hackathon.jpg',
-              ),
+      child: InkWell(
+        borderRadius:
+        BorderRadius.circular(28),
+        onTap: () {
+          _openEvent(events[0]);
+        },
+        child: Container(
+          height: 420,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius:
+            BorderRadius.circular(28),
+            border: Border.all(
+              color: borderColor,
             ),
+          ),
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 235,
+                width: double.infinity,
+                child: HoverImage(
+                  image:
+                  'assets/images/event_hackathon.jpg',
+                ),
+              ),
 
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(23),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Text(
-                          '12 OCT 2026',
-                          style: TextStyle(
-                            color: iituRed,
-                            fontSize: 9,
-                            letterSpacing: 1,
-                            fontWeight:
-                            FontWeight.w600,
+              Expanded(
+                child: Padding(
+                  padding:
+                  const EdgeInsets.all(23),
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Text(
+                            '12 OCT 2026',
+                            style: TextStyle(
+                              color: iituRed,
+                              fontSize: 9,
+                              letterSpacing: 1,
+                              fontWeight:
+                              FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        Spacer(),
-                        Text(
-                          'HACKATHON',
-                          style: TextStyle(
-                            color: greyText,
-                            fontSize: 8.5,
-                            letterSpacing: 1,
+                          Spacer(),
+                          Text(
+                            'HACKATHON',
+                            style: TextStyle(
+                              color: greyText,
+                              fontSize: 8.5,
+                              letterSpacing: 1,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 11),
-
-                    const Text(
-                      'Almaty Student Hackathon',
-                      style: TextStyle(
-                        fontSize: 20,
-                        height: 1.12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.6,
+                        ],
                       ),
-                    ),
-
-                    const Spacer(),
-
-                    Row(
-                      children: [
-                        const Text(
-                          'Team up. Build. Innovate.',
-                          style: TextStyle(
-                            color: greyText,
-                            fontSize: 11,
-                          ),
+                      const SizedBox(height: 11),
+                      const Text(
+                        'Almaty Student Hackathon',
+                        style: TextStyle(
+                          fontSize: 20,
+                          height: 1.12,
+                          fontWeight:
+                          FontWeight.w600,
+                          letterSpacing: -0.6,
                         ),
-                        const Spacer(),
-                        IconButton(
-                          onPressed: () {
-                            _changePage(1);
-                          },
-                          icon: const Icon(
+                      ),
+                      const Spacer(),
+                      const Row(
+                        children: [
+                          Text(
+                            'View event',
+                            style: TextStyle(
+                              color: greyText,
+                              fontSize: 11,
+                            ),
+                          ),
+                          Spacer(),
+                          Icon(
                             Icons.north_east,
                             size: 16,
                             color: iituRed,
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1675,7 +1676,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 13),
                   TextButton.icon(
                     onPressed: () {
                       _showMessage(
@@ -1704,7 +1705,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // EVENTS SHOWCASE
+  // EVENTS HOME SECTION
   // ============================================================
 
   Widget _eventsShowcase() {
@@ -1756,78 +1757,17 @@ class _CampusPortalState extends State<CampusPortal> {
 
         const SizedBox(height: 35),
 
-        LayoutBuilder(
-          builder: (
-              context,
-              constraints,
-              ) {
-            final desktop =
-                constraints.maxWidth >= 930;
-
-            final mainCard =
-            AnimatedSwitcher(
-              duration: const Duration(
-                milliseconds: 420,
-              ),
-              child: _largeEventCard(
-                event,
-                _eventIndex,
-                key: ValueKey(_eventIndex),
-              ),
-            );
-
-            if (!desktop) {
-              return Column(
-                children: [
-                  mainCard,
-                  const SizedBox(height: 18),
-                  _eventDots(),
-                ],
-              );
-            }
-
-            final previews = <Widget>[];
-
-            for (int i = 0;
-            i < events.length;
-            i++) {
-              if (i != _eventIndex) {
-                previews.add(
-                  Padding(
-                    padding:
-                    const EdgeInsets.only(
-                      bottom: 14,
-                    ),
-                    child: _eventPreviewCard(
-                      events[i],
-                      i,
-                    ),
-                  ),
-                );
-              }
-            }
-
-            return Row(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: mainCard,
-                ),
-                const SizedBox(width: 18),
-                SizedBox(
-                  width: 290,
-                  child: Column(
-                    children: previews,
-                  ),
-                ),
-              ],
-            );
-          },
+        AnimatedSwitcher(
+          duration: const Duration(
+            milliseconds: 420,
+          ),
+          child: _largeEventCard(
+            event,
+            key: ValueKey(_eventIndex),
+          ),
         ),
 
-        const SizedBox(height: 15),
+        const SizedBox(height: 17),
 
         Row(
           children: [
@@ -1835,7 +1775,9 @@ class _CampusPortalState extends State<CampusPortal> {
               child: _eventDots(),
             ),
             TextButton.icon(
-              onPressed: () => _changePage(1),
+              onPressed: () {
+                _changePage(1);
+              },
               style: TextButton.styleFrom(
                 foregroundColor: iituRed,
               ),
@@ -1854,241 +1796,180 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   Widget _largeEventCard(
-      CampusEvent event,
-      int index, {
+      CampusEvent event, {
         Key? key,
       }) {
-    final registered =
-    _registeredEvents.contains(index);
-
-    return Container(
-      key: key,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: borderColor,
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (
-            context,
-            constraints,
-            ) {
-          final horizontal =
-              constraints.maxWidth >= 700;
-
-          final image = SizedBox(
-            width: horizontal
-                ? constraints.maxWidth * 0.48
-                : double.infinity,
-            height: horizontal ? 370 : 245,
-            child: HoverImage(
-              image: event.image,
-            ),
-          );
-
-          final info = Padding(
-            padding: const EdgeInsets.all(29),
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: softRed,
-                    borderRadius:
-                    BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    event.date,
-                    style: const TextStyle(
-                      color: iituRed,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                Text(
-                  event.category.toUpperCase(),
-                  style: const TextStyle(
-                    color: iituRed,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-
-                const SizedBox(height: 9),
-
-                Text(
-                  event.title,
-                  style: const TextStyle(
-                    fontSize: 27,
-                    height: 1.08,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.9,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                Text(
-                  event.description,
-                  style: const TextStyle(
-                    color: greyText,
-                    fontSize: 12.5,
-                    height: 1.55,
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                Wrap(
-                  spacing: 18,
-                  runSpacing: 8,
-                  children: [
-                    _eventInfo(
-                      Icons.access_time_rounded,
-                      event.time,
-                    ),
-                    _eventInfo(
-                      Icons.location_on_outlined,
-                      event.location,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: registered
-                        ? null
-                        : () {
-                      _registerEvent(index);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor: iituRed,
-                      foregroundColor: Colors.white,
-                      padding:
-                      const EdgeInsets.symmetric(
-                        vertical: 14,
-                      ),
-                    ),
-                    child: Text(
-                      registered
-                          ? '✓ Registered'
-                          : 'Register',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-
-          if (!horizontal) {
-            return Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-              children: [
-                image,
-                info,
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              image,
-              Expanded(
-                child: info,
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _eventPreviewCard(
-      CampusEvent event,
-      int index,
-      ) {
     return PremiumHover(
+      key: key,
       child: InkWell(
         borderRadius:
-        BorderRadius.circular(22),
+        BorderRadius.circular(30),
         onTap: () {
-          setState(() {
-            _eventIndex = index;
-          });
+          _openEvent(event);
         },
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius:
-            BorderRadius.circular(22),
+            BorderRadius.circular(30),
             border: Border.all(
               color: borderColor,
             ),
           ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 92,
-                height: 108,
-                child: Image.asset(
-                  event.image,
-                  fit: BoxFit.cover,
+          child: LayoutBuilder(
+            builder: (
+                context,
+                constraints,
+                ) {
+              final horizontal =
+                  constraints.maxWidth >= 720;
+
+              final image = SizedBox(
+                width: horizontal
+                    ? constraints.maxWidth *
+                    0.50
+                    : double.infinity,
+                height: horizontal ? 380 : 250,
+                child: HoverImage(
+                  image: event.image,
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      Text(
+              );
+
+              final info = Padding(
+                padding:
+                const EdgeInsets.all(31),
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding:
+                      const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: softRed,
+                        borderRadius:
+                        BorderRadius.circular(
+                          30,
+                        ),
+                      ),
+                      child: Text(
                         event.date,
                         style: const TextStyle(
                           color: iituRed,
-                          fontSize: 9,
+                          fontSize: 9.5,
                           fontWeight:
                           FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 7),
-                      Text(
-                        event.title,
-                        maxLines: 2,
-                        overflow:
-                        TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight:
-                          FontWeight.w500,
+                    ),
+
+                    const SizedBox(height: 19),
+
+                    Text(
+                      event.category.toUpperCase(),
+                      style: const TextStyle(
+                        color: iituRed,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+
+                    const SizedBox(height: 9),
+
+                    Text(
+                      event.title,
+                      style: const TextStyle(
+                        fontSize: 29,
+                        height: 1.08,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -1,
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    Text(
+                      event.description,
+                      style: const TextStyle(
+                        color: greyText,
+                        fontSize: 12.5,
+                        height: 1.6,
+                      ),
+                    ),
+
+                    const SizedBox(height: 21),
+
+                    Wrap(
+                      spacing: 18,
+                      runSpacing: 8,
+                      children: [
+                        _eventInfo(
+                          Icons.access_time_rounded,
+                          event.time,
+                        ),
+                        _eventInfo(
+                          Icons.location_on_outlined,
+                          event.location,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        _openEvent(event);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: iituRed,
+                        foregroundColor:
+                        Colors.white,
+                        padding:
+                        const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 15,
                         ),
                       ),
-                    ],
-                  ),
+                      icon: const Icon(
+                        Icons.arrow_forward,
+                        size: 16,
+                      ),
+                      label: const Text(
+                        'View Event',
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              );
+
+              if (!horizontal) {
+                return Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
+                  children: [
+                    image,
+                    info,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  image,
+                  Expanded(
+                    child: info,
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -2218,7 +2099,7 @@ class _CampusPortalState extends State<CampusPortal> {
             }
 
             return SizedBox(
-              height: 490,
+              height: 495,
               child: Row(
                 children: [
                   Expanded(
@@ -2233,7 +2114,9 @@ class _CampusPortalState extends State<CampusPortal> {
                       number: '01',
                     ),
                   ),
+
                   const SizedBox(width: 18),
+
                   Expanded(
                     flex: 2,
                     child: Column(
@@ -2269,12 +2152,14 @@ class _CampusPortalState extends State<CampusPortal> {
           },
         ),
 
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
 
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
-            onPressed: () => _changePage(2),
+            onPressed: () {
+              _changePage(2);
+            },
             style: TextButton.styleFrom(
               foregroundColor: iituRed,
             ),
@@ -2292,7 +2177,7 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // FOOTER / GLOBAL
+  // GLOBAL FOOTER
   // ============================================================
 
   Widget _globalFooter() {
@@ -2340,7 +2225,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   'Grow beyond\nborders with IITU.',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 38,
+                    fontSize: 39,
                     height: 1.05,
                     fontWeight: FontWeight.w500,
                     letterSpacing: -1.5,
@@ -2402,7 +2287,7 @@ class _CampusPortalState extends State<CampusPortal> {
           }
 
           return SizedBox(
-            height: 410,
+            height: 415,
             child: Row(
               children: [
                 Expanded(
@@ -2431,7 +2316,7 @@ class _CampusPortalState extends State<CampusPortal> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         24,
-        58,
+        60,
         24,
         100,
       ),
@@ -2473,142 +2358,21 @@ class _CampusPortalState extends State<CampusPortal> {
                 return Wrap(
                   spacing: 18,
                   runSpacing: 18,
-                  children: List.generate(
-                    events.length,
-                        (index) {
+                  children: events.map(
+                        (event) {
                       return SizedBox(
                         width: cardWidth,
-                        child: _eventPageCard(
-                          events[index],
-                          index,
+                        child: EventPageCard(
+                          event: event,
+                          onTap: () {
+                            _openEvent(event);
+                          },
                         ),
                       );
                     },
-                  ),
+                  ).toList(),
                 );
               },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _eventPageCard(
-      CampusEvent event,
-      int index,
-      ) {
-    final registered =
-    _registeredEvents.contains(index);
-
-    return PremiumHover(
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: borderColor,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 210,
-              width: double.infinity,
-              child: HoverImage(
-                image: event.image,
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        event.date,
-                        style: const TextStyle(
-                          color: iituRed,
-                          fontSize: 9,
-                          fontWeight:
-                          FontWeight.w600,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        event.category
-                            .toUpperCase(),
-                        style: const TextStyle(
-                          color: greyText,
-                          fontSize: 8.5,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    event.title,
-                    style: const TextStyle(
-                      fontSize: 19,
-                      height: 1.15,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 11),
-                  Text(
-                    event.description,
-                    style: const TextStyle(
-                      color: greyText,
-                      fontSize: 11.5,
-                      height: 1.55,
-                    ),
-                  ),
-                  const SizedBox(height: 17),
-                  _eventInfo(
-                    Icons.access_time,
-                    event.time,
-                  ),
-                  const SizedBox(height: 8),
-                  _eventInfo(
-                    Icons.location_on_outlined,
-                    event.location,
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: registered
-                          ? null
-                          : () {
-                        _registerEvent(index);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: iituRed,
-                        foregroundColor:
-                        Colors.white,
-                        padding:
-                        const EdgeInsets.symmetric(
-                          vertical: 14,
-                        ),
-                      ),
-                      child: Text(
-                        registered
-                            ? '✓ Registered'
-                            : 'Register',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -2634,7 +2398,7 @@ class _CampusPortalState extends State<CampusPortal> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         24,
-        58,
+        60,
         24,
         100,
       ),
@@ -2894,6 +2658,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 h * 0.22,
                 const Color(0xFFFFE7EB),
               ),
+
               _room(
                 w * 0.12,
                 h * 0.44,
@@ -2901,6 +2666,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 h * 0.24,
                 const Color(0xFFFFF0DC),
               ),
+
               _room(
                 w * 0.66,
                 h * 0.16,
@@ -2908,6 +2674,7 @@ class _CampusPortalState extends State<CampusPortal> {
                 h * 0.22,
                 const Color(0xFFE7EEFA),
               ),
+
               _room(
                 w * 0.66,
                 h * 0.44,
@@ -3232,8 +2999,7 @@ class _CampusPortalState extends State<CampusPortal> {
             name: 'Innovation Hub',
             description:
             'Projects, startups and innovation.',
-            icon:
-            Icons.lightbulb_outline,
+            icon: Icons.lightbulb_outline,
             position:
             Alignment(0.50, -0.36),
           ),
@@ -3281,14 +3047,14 @@ class _CampusPortalState extends State<CampusPortal> {
   }
 
   // ============================================================
-  // PROFILE PAGE
+  // PROFILE
   // ============================================================
 
   Widget _profilePage() {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         24,
-        58,
+        60,
         24,
         100,
       ),
@@ -3332,9 +3098,7 @@ class _CampusPortalState extends State<CampusPortal> {
                       width: 335,
                       child: _profileCard(),
                     ),
-
                     const SizedBox(width: 25),
-
                     Expanded(
                       child:
                       _profileAcademicSection(),
@@ -3424,19 +3188,16 @@ class _CampusPortalState extends State<CampusPortal> {
                   SizedBox(height: 22),
                   Divider(),
                   SizedBox(height: 12),
-
                   ProfileLine(
                     icon: Icons.email_outlined,
                     text:
                     'irada41151@student.iitu.kz',
                   ),
-
                   ProfileLine(
                     icon: Icons.school_outlined,
                     text:
                     'International Information Technology University',
                   ),
-
                   ProfileLine(
                     icon:
                     Icons.location_on_outlined,
@@ -3478,20 +3239,16 @@ class _CampusPortalState extends State<CampusPortal> {
                   letterSpacing: 1.3,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               const Text(
                 'Current progress',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 25,
                   fontWeight: FontWeight.w600,
                   letterSpacing: -0.7,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               const Text(
                 'A quick summary of your academic performance this semester.',
                 style: TextStyle(
@@ -3499,8 +3256,7 @@ class _CampusPortalState extends State<CampusPortal> {
                   fontSize: 12,
                 ),
               ),
-
-              const SizedBox(height: 26),
+              const SizedBox(height: 27),
 
               LayoutBuilder(
                 builder: (
@@ -3572,7 +3328,7 @@ class _CampusPortalState extends State<CampusPortal> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 25),
 
         const Text(
           'Academic Records',
@@ -3667,7 +3423,8 @@ class _CampusPortalState extends State<CampusPortal> {
                           Container(
                             width: 49,
                             height: 49,
-                            alignment: Alignment.center,
+                            alignment:
+                            Alignment.center,
                             decoration: BoxDecoration(
                               color: softRed,
                               borderRadius:
@@ -3680,9 +3437,7 @@ class _CampusPortalState extends State<CampusPortal> {
                               color: iituRed,
                             ),
                           ),
-
                           const SizedBox(width: 15),
-
                           Expanded(
                             child: Column(
                               mainAxisAlignment:
@@ -3709,7 +3464,6 @@ class _CampusPortalState extends State<CampusPortal> {
                               ],
                             ),
                           ),
-
                           const Icon(
                             Icons.north_east,
                             color: iituRed,
@@ -3752,6 +3506,2841 @@ class _CampusPortalState extends State<CampusPortal> {
 }
 
 // ============================================================
+// STUDENT SERVICES FORM PAGE
+// ============================================================
+
+class StudentServicesPage extends StatefulWidget {
+  final ServiceRequestSummary? lastRequest;
+  final ValueChanged<ServiceRequestSummary>
+  onSubmitted;
+
+  const StudentServicesPage({
+    super.key,
+    required this.lastRequest,
+    required this.onSubmitted,
+  });
+
+  @override
+  State<StudentServicesPage> createState() =>
+      _StudentServicesPageState();
+}
+
+class _StudentServicesPageState
+    extends State<StudentServicesPage> {
+  // Form key gives access to validate(), save() and reset().
+  final GlobalKey<FormState> _formKey =
+  GlobalKey<FormState>();
+
+  final TextEditingController _nameController =
+  TextEditingController(
+    text: 'Akvarzhanova Irada',
+  );
+
+  final TextEditingController _idController =
+  TextEditingController(
+    text: '41151',
+  );
+
+  final TextEditingController _emailController =
+  TextEditingController(
+    text: 'irada41151@student.iitu.kz',
+  );
+
+  final TextEditingController _phoneController =
+  TextEditingController();
+
+  final TextEditingController _subjectController =
+  TextEditingController();
+
+  final TextEditingController _detailsController =
+  TextEditingController();
+
+  final TextEditingController _otherController =
+  TextEditingController();
+
+  final List<String> _categories = const [
+    'Lost Student ID Card',
+    'Wi-Fi / Internet',
+    'Dormitory Issue',
+    'Library Access',
+    'Academic Documents',
+    'Payment Question',
+    'Student Account / Login',
+    'Campus Facilities',
+    'Security / Access',
+    'Other',
+  ];
+
+  String? _category;
+  String? _urgency;
+  String? _contactMethod;
+  DateTime? _preferredDate;
+
+  bool _declaration = false;
+
+  // Saved values are written only after the complete form is valid.
+  String _savedName = '';
+  String _savedId = '';
+  String _savedEmail = '';
+  String _savedSubject = '';
+  String _savedDetails = '';
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Listeners keep the animated completion progress live.
+    _nameController.addListener(_refreshProgress);
+    _idController.addListener(_refreshProgress);
+    _emailController.addListener(_refreshProgress);
+    _phoneController.addListener(_refreshProgress);
+    _subjectController.addListener(_refreshProgress);
+    _detailsController.addListener(_refreshProgress);
+    _otherController.addListener(_refreshProgress);
+  }
+
+  @override
+  void dispose() {
+    // Required controller cleanup.
+    _nameController.dispose();
+    _idController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _subjectController.dispose();
+    _detailsController.dispose();
+    _otherController.dispose();
+
+    super.dispose();
+  }
+
+  void _refreshProgress() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  double get _completion {
+    int total = 10;
+    int completed = 0;
+
+    if (_nameController.text.trim().isNotEmpty) {
+      completed++;
+    }
+
+    if (_idController.text.trim().length >= 5) {
+      completed++;
+    }
+
+    if (_emailController.text
+        .trim()
+        .contains('@')) {
+      completed++;
+    }
+
+    if (_category != null) {
+      completed++;
+    }
+
+    if (_subjectController.text.trim().length >=
+        5) {
+      completed++;
+    }
+
+    if (_detailsController.text.trim().length >=
+        20) {
+      completed++;
+    }
+
+    if (_urgency != null) {
+      completed++;
+    }
+
+    if (_contactMethod != null) {
+      completed++;
+    }
+
+    if (_preferredDate != null) {
+      completed++;
+    }
+
+    if (_declaration) {
+      completed++;
+    }
+
+    if (_category == 'Other') {
+      total++;
+
+      if (_otherController.text.trim().length >=
+          10) {
+        completed++;
+      }
+    }
+
+    return completed / total;
+  }
+
+  String _dateText(
+      DateTime? date,
+      ) {
+    if (date == null) {
+      return 'Select date';
+    }
+
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Future<void> _selectDate(
+      FormFieldState<DateTime> field,
+      ) async {
+    final today = DateTime.now();
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate:
+      _preferredDate ?? today,
+      firstDate: DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ),
+      lastDate: DateTime(
+        today.year + 2,
+      ),
+      helpText:
+      'Select preferred response date',
+    );
+
+    if (picked != null) {
+      setState(() {
+        _preferredDate = picked;
+      });
+
+      field.didChange(picked);
+    }
+  }
+
+  String _createReference() {
+    final number =
+        DateTime.now().millisecondsSinceEpoch %
+            1000000;
+
+    return 'IITU-SR-${number.toString().padLeft(6, '0')}';
+  }
+
+  Future<void> _submitForm() async {
+    // Validation happens before save.
+    final valid =
+        _formKey.currentState?.validate() ??
+            false;
+
+    if (!valid) {
+      ScaffoldMessenger.of(context)
+          .hideCurrentSnackBar();
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Please check the highlighted fields.',
+          ),
+          backgroundColor: iituRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(15),
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    // save() runs only after all validators pass.
+    _formKey.currentState!.save();
+
+    final category = _category == 'Other'
+        ? 'Other: ${_otherController.text.trim()}'
+        : _category!;
+
+    final request =
+    ServiceRequestSummary(
+      reference: _createReference(),
+      studentName: _savedName,
+      studentId: _savedId,
+      email: _savedEmail,
+      category: category,
+      subject: _savedSubject,
+      details: _savedDetails,
+      urgency: _urgency!,
+      contactMethod: _contactMethod!,
+      preferredDate:
+      _dateText(_preferredDate),
+    );
+
+    widget.onSubmitted(request);
+
+    await _showSuccessDialog(request);
+  }
+
+  Future<void> _showSuccessDialog(
+      ServiceRequestSummary request,
+      ) {
+    return showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Request submitted',
+      barrierColor: Colors.black.withOpacity(
+        0.35,
+      ),
+      transitionDuration:
+      const Duration(milliseconds: 300),
+      pageBuilder: (
+          context,
+          animation,
+          secondaryAnimation,
+          ) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 480,
+              margin: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(
+                      0.12,
+                    ),
+                    blurRadius: 40,
+                    offset: const Offset(
+                      0,
+                      20,
+                    ),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(
+                      milliseconds: 450,
+                    ),
+                    curve: Curves.elasticOut,
+                    tween: Tween(
+                      begin: 0.4,
+                      end: 1,
+                    ),
+                    builder: (
+                        context,
+                        value,
+                        child,
+                        ) {
+                      return Transform.scale(
+                        scale: value,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration:
+                      const BoxDecoration(
+                        color: Color(0xFFEAF7F0),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: successGreen,
+                        size: 37,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'Request submitted',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.7,
+                    ),
+                  ),
+
+                  const SizedBox(height: 7),
+
+                  const Text(
+                    'Your request was successfully created.',
+                    style: TextStyle(
+                      color: greyText,
+                      fontSize: 12.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: const Color(
+                        0xFFF7F7F9,
+                      ),
+                      borderRadius:
+                      BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        _dialogRow(
+                          'Reference',
+                          request.reference,
+                        ),
+                        _dialogRow(
+                          'Issue',
+                          request.category,
+                        ),
+                        _dialogRow(
+                          'Urgency',
+                          request.urgency,
+                        ),
+                        _dialogRow(
+                          'Contact',
+                          request.contactMethod,
+                        ),
+                        _dialogRow(
+                          'Preferred date',
+                          request.preferredDate,
+                          last: true,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 23),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      style:
+                      ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: iituRed,
+                        foregroundColor:
+                        Colors.white,
+                        padding:
+                        const EdgeInsets.symmetric(
+                          vertical: 15,
+                        ),
+                      ),
+                      child: const Text(
+                        'Done',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (
+          context,
+          animation,
+          secondaryAnimation,
+          child,
+          ) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(
+              begin: 0.94,
+              end: 1,
+            ).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              ),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _dialogRow(
+      String label,
+      String value, {
+        bool last = false,
+      }) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: last ? 0 : 13,
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 115,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: greyText,
+                fontSize: 10.5,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _resetForm() {
+    // reset() clears FormField validation states.
+    _formKey.currentState?.reset();
+
+    // Controllers and non-Form state are reset as well.
+    _nameController.text =
+    'Akvarzhanova Irada';
+    _idController.text = '41151';
+    _emailController.text =
+    'irada41151@student.iitu.kz';
+
+    _phoneController.clear();
+    _subjectController.clear();
+    _detailsController.clear();
+    _otherController.clear();
+
+    setState(() {
+      _category = null;
+      _urgency = null;
+      _contactMethod = null;
+      _preferredDate = null;
+      _declaration = false;
+    });
+
+    ScaffoldMessenger.of(context)
+        .hideCurrentSnackBar();
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: const Text(
+          'The request form has been reset.',
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: darkText,
+        shape: RoundedRectangleBorder(
+          borderRadius:
+          BorderRadius.circular(15),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final percent =
+    (_completion * 100).round();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(
+        24,
+        58,
+        24,
+        100,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 1050,
+          ),
+          child: Form(
+            key: _formKey,
+
+            // Errors appear after the user interacts with a field.
+            autovalidateMode:
+            AutovalidateMode
+                .onUserInteraction,
+
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                const PremiumHeading(
+                  eyebrow: 'STUDENT SERVICES',
+                  title: 'How can we help?',
+                  subtitle:
+                  'Submit a campus service request and the appropriate IITU team can review your information.',
+                ),
+
+                const SizedBox(height: 32),
+
+                // Advanced customization: animated completion progress.
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                    BorderRadius.circular(24),
+                    border: Border.all(
+                      color: borderColor,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Request completion',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight:
+                              FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '$percent%',
+                            style: const TextStyle(
+                              color: iituRed,
+                              fontSize: 12,
+                              fontWeight:
+                              FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 13),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(
+                          begin: 0,
+                          end: _completion,
+                        ),
+                        duration: const Duration(
+                          milliseconds: 350,
+                        ),
+                        curve: Curves.easeOutCubic,
+                        builder: (
+                            context,
+                            value,
+                            child,
+                            ) {
+                          return ClipRRect(
+                            borderRadius:
+                            BorderRadius.circular(
+                              20,
+                            ),
+                            child:
+                            LinearProgressIndicator(
+                              value: value,
+                              minHeight: 7,
+                              backgroundColor:
+                              softGrey,
+                              color: iituRed,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                FormSectionCard(
+                  number: '01',
+                  title: 'Student details',
+                  subtitle:
+                  'Tell us who is submitting the request.',
+                  child: LayoutBuilder(
+                    builder: (
+                        context,
+                        constraints,
+                        ) {
+                      final desktop =
+                          constraints.maxWidth >=
+                              700;
+
+                      final width = desktop
+                          ? (constraints.maxWidth -
+                          16) /
+                          2
+                          : constraints.maxWidth;
+
+                      return Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          SizedBox(
+                            width: width,
+                            child: TextFormField(
+                              controller:
+                              _nameController,
+                              textInputAction:
+                              TextInputAction.next,
+                              decoration:
+                              const InputDecoration(
+                                labelText:
+                                'Full name',
+                                hintText:
+                                'First and last name',
+                                prefixIcon: Icon(
+                                  Icons
+                                      .person_outline,
+                                ),
+                              ),
+                              validator: (value) {
+                                final text =
+                                    value?.trim() ??
+                                        '';
+
+                                if (text.isEmpty) {
+                                  return 'Please enter your full name.';
+                                }
+
+                                if (!text.contains(
+                                  ' ',
+                                )) {
+                                  return 'Please enter at least two names.';
+                                }
+
+                                return null;
+                              },
+                              onSaved: (value) {
+                                _savedName =
+                                    value!.trim();
+                              },
+                            ),
+                          ),
+
+                          SizedBox(
+                            width: width,
+                            child: TextFormField(
+                              controller:
+                              _idController,
+                              textInputAction:
+                              TextInputAction.next,
+                              decoration:
+                              const InputDecoration(
+                                labelText:
+                                'Student ID',
+                                hintText: '41151',
+                                prefixIcon: Icon(
+                                  Icons
+                                      .badge_outlined,
+                                ),
+                              ),
+                              validator: (value) {
+                                final text =
+                                    value?.trim() ??
+                                        '';
+
+                                if (text.isEmpty) {
+                                  return 'Please enter your Student ID.';
+                                }
+
+                                if (text.length < 5) {
+                                  return 'Student ID must contain at least 5 characters.';
+                                }
+
+                                return null;
+                              },
+                              onSaved: (value) {
+                                _savedId =
+                                    value!.trim();
+                              },
+                            ),
+                          ),
+
+                          SizedBox(
+                            width: width,
+                            child: TextFormField(
+                              controller:
+                              _emailController,
+                              keyboardType:
+                              TextInputType
+                                  .emailAddress,
+                              textInputAction:
+                              TextInputAction.next,
+                              decoration:
+                              const InputDecoration(
+                                labelText:
+                                'Campus email',
+                                hintText:
+                                'name@student.iitu.kz',
+                                prefixIcon: Icon(
+                                  Icons
+                                      .email_outlined,
+                                ),
+                              ),
+                              validator: (value) {
+                                final email =
+                                    value?.trim() ??
+                                        '';
+
+                                final emailRegex =
+                                RegExp(
+                                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                                );
+
+                                if (email.isEmpty) {
+                                  return 'Please enter your campus email.';
+                                }
+
+                                if (!emailRegex
+                                    .hasMatch(
+                                  email,
+                                )) {
+                                  return 'Enter a valid email address.';
+                                }
+
+                                if (!email.endsWith(
+                                  '@student.iitu.kz',
+                                )) {
+                                  return 'Use your @student.iitu.kz email.';
+                                }
+
+                                return null;
+                              },
+                              onSaved: (value) {
+                                _savedEmail =
+                                    value!.trim();
+                              },
+                            ),
+                          ),
+
+                          SizedBox(
+                            width: width,
+                            child: TextFormField(
+                              controller:
+                              _phoneController,
+                              keyboardType:
+                              TextInputType.phone,
+                              textInputAction:
+                              TextInputAction.next,
+                              decoration:
+                              const InputDecoration(
+                                labelText:
+                                'Phone number',
+                                hintText:
+                                '+7 700 000 00 00',
+                                prefixIcon: Icon(
+                                  Icons
+                                      .phone_outlined,
+                                ),
+                              ),
+                              validator: (value) {
+                                final phone =
+                                    value?.trim() ??
+                                        '';
+
+                                if (phone.isEmpty) {
+                                  return null;
+                                }
+
+                                final phoneRegex =
+                                RegExp(
+                                  r'^\+?[0-9\s\-]{7,18}$',
+                                );
+
+                                if (!phoneRegex
+                                    .hasMatch(
+                                  phone,
+                                )) {
+                                  return 'Enter a valid phone number.';
+                                }
+
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                FormSectionCard(
+                  number: '02',
+                  title: 'What do you need help with?',
+                  subtitle:
+                  'Choose the campus service that best matches your issue.',
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: _category,
+                        isExpanded: true,
+                        decoration:
+                        const InputDecoration(
+                          labelText:
+                          'Service category',
+                          prefixIcon: Icon(
+                            Icons
+                                .support_agent_outlined,
+                          ),
+                        ),
+                        hint: const Text(
+                          'Select a problem',
+                        ),
+                        items: _categories
+                            .map(
+                              (
+                              category,
+                              ) =>
+                              DropdownMenuItem<
+                                  String>(
+                                value: category,
+                                child: Text(
+                                  category,
+                                ),
+                              ),
+                        )
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _category = value;
+
+                            if (value !=
+                                'Other') {
+                              _otherController
+                                  .clear();
+                            }
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Please select a service category.';
+                          }
+
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          IssueQuickChip(
+                            label:
+                            'Wi-Fi / Internet',
+                            selected:
+                            _category ==
+                                'Wi-Fi / Internet',
+                            onTap: () {
+                              setState(() {
+                                _category =
+                                'Wi-Fi / Internet';
+                                _otherController
+                                    .clear();
+                              });
+                            },
+                          ),
+                          IssueQuickChip(
+                            label:
+                            'Lost Student ID Card',
+                            selected:
+                            _category ==
+                                'Lost Student ID Card',
+                            onTap: () {
+                              setState(() {
+                                _category =
+                                'Lost Student ID Card';
+                                _otherController
+                                    .clear();
+                              });
+                            },
+                          ),
+                          IssueQuickChip(
+                            label:
+                            'Academic Documents',
+                            selected:
+                            _category ==
+                                'Academic Documents',
+                            onTap: () {
+                              setState(() {
+                                _category =
+                                'Academic Documents';
+                                _otherController
+                                    .clear();
+                              });
+                            },
+                          ),
+                          IssueQuickChip(
+                            label: 'Other',
+                            selected:
+                            _category ==
+                                'Other',
+                            onTap: () {
+                              setState(() {
+                                _category =
+                                'Other';
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+
+                      // Advanced customization:
+                      // the extra field appears only for "Other".
+                      AnimatedSwitcher(
+                        duration: const Duration(
+                          milliseconds: 260,
+                        ),
+                        transitionBuilder: (
+                            child,
+                            animation,
+                            ) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child:
+                            SizeTransition(
+                              sizeFactor:
+                              animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _category == 'Other'
+                            ? Padding(
+                          key: const ValueKey(
+                            'other-field',
+                          ),
+                          padding:
+                          const EdgeInsets
+                              .only(
+                            top: 18,
+                          ),
+                          child:
+                          TextFormField(
+                            controller:
+                            _otherController,
+                            maxLength: 180,
+                            maxLines: 3,
+                            decoration:
+                            const InputDecoration(
+                              labelText:
+                              'Tell us what happened',
+                              hintText:
+                              'Describe the issue that is not listed above...',
+                              alignLabelWithHint:
+                              true,
+                            ),
+                            validator:
+                                (value) {
+                              if (_category !=
+                                  'Other') {
+                                return null;
+                              }
+
+                              final text =
+                                  value?.trim() ??
+                                      '';
+
+                              if (text.length <
+                                  10) {
+                                return 'Please describe the issue in at least 10 characters.';
+                              }
+
+                              return null;
+                            },
+                          ),
+                        )
+                            : const SizedBox
+                            .shrink(
+                          key: ValueKey(
+                            'no-other-field',
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      TextFormField(
+                        controller:
+                        _subjectController,
+                        textInputAction:
+                        TextInputAction.next,
+                        decoration:
+                        const InputDecoration(
+                          labelText:
+                          'Request subject',
+                          hintText:
+                          'Briefly describe your request',
+                          prefixIcon: Icon(
+                            Icons
+                                .short_text_rounded,
+                          ),
+                        ),
+                        validator: (value) {
+                          final text =
+                              value?.trim() ??
+                                  '';
+
+                          if (text.isEmpty) {
+                            return 'Please enter a request subject.';
+                          }
+
+                          if (text.length < 5) {
+                            return 'Use at least 5 characters.';
+                          }
+
+                          return null;
+                        },
+                        onSaved: (value) {
+                          _savedSubject =
+                              value!.trim();
+                        },
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // Advanced customization:
+                      // live 0/300 counter and maximum length.
+                      TextFormField(
+                        controller:
+                        _detailsController,
+                        maxLines: 6,
+                        maxLength: 300,
+                        keyboardType:
+                        TextInputType.multiline,
+                        textInputAction:
+                        TextInputAction.newline,
+                        decoration:
+                        const InputDecoration(
+                          labelText:
+                          'Request details',
+                          hintText:
+                          'Explain what happened and what kind of help you need...',
+                          alignLabelWithHint: true,
+                          prefixIcon: Padding(
+                            padding:
+                            EdgeInsets.only(
+                              bottom: 92,
+                            ),
+                            child: Icon(
+                              Icons
+                                  .description_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          final text =
+                              value?.trim() ??
+                                  '';
+
+                          if (text.isEmpty) {
+                            return 'Please describe your request.';
+                          }
+
+                          if (text.length < 20) {
+                            return 'Please provide at least 20 characters.';
+                          }
+
+                          return null;
+                        },
+                        onSaved: (value) {
+                          _savedDetails =
+                              value!.trim();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                FormSectionCard(
+                  number: '03',
+                  title: 'Request preferences',
+                  subtitle:
+                  'Tell us how urgent the request is and how you prefer to be contacted.',
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      const FormMiniTitle(
+                        title: 'Urgency',
+                        subtitle:
+                        'Choose one level.',
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      FormField<String>(
+                        initialValue: _urgency,
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Please select an urgency level.';
+                          }
+
+                          return null;
+                        },
+                        onSaved: (value) {
+                          _urgency = value;
+                        },
+                        builder: (field) {
+                          return Column(
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: [
+                                  SelectionChip(
+                                    label:
+                                    'Normal',
+                                    icon: Icons
+                                        .schedule_outlined,
+                                    selected:
+                                    _urgency ==
+                                        'Normal',
+                                    onTap: () {
+                                      setState(() {
+                                        _urgency =
+                                        'Normal';
+                                      });
+
+                                      field.didChange(
+                                        'Normal',
+                                      );
+                                    },
+                                  ),
+                                  SelectionChip(
+                                    label: 'Soon',
+                                    icon: Icons
+                                        .update_rounded,
+                                    selected:
+                                    _urgency ==
+                                        'Soon',
+                                    onTap: () {
+                                      setState(() {
+                                        _urgency =
+                                        'Soon';
+                                      });
+
+                                      field.didChange(
+                                        'Soon',
+                                      );
+                                    },
+                                  ),
+                                  SelectionChip(
+                                    label:
+                                    'Urgent',
+                                    icon: Icons
+                                        .priority_high_rounded,
+                                    selected:
+                                    _urgency ==
+                                        'Urgent',
+                                    onTap: () {
+                                      setState(() {
+                                        _urgency =
+                                        'Urgent';
+                                      });
+
+                                      field.didChange(
+                                        'Urgent',
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+
+                              if (field.hasError)
+                                Padding(
+                                  padding:
+                                  const EdgeInsets
+                                      .only(
+                                    top: 8,
+                                    left: 12,
+                                  ),
+                                  child: Text(
+                                    field.errorText!,
+                                    style:
+                                    const TextStyle(
+                                      color: iituRed,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 25),
+
+                      const Divider(),
+
+                      const SizedBox(height: 22),
+
+                      const FormMiniTitle(
+                        title:
+                        'Preferred contact',
+                        subtitle:
+                        'How should the university contact you?',
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      FormField<String>(
+                        initialValue:
+                        _contactMethod,
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Please select a contact method.';
+                          }
+
+                          return null;
+                        },
+                        onSaved: (value) {
+                          _contactMethod = value;
+                        },
+                        builder: (field) {
+                          return Column(
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: [
+                                  SelectionChip(
+                                    label: 'Email',
+                                    icon: Icons
+                                        .email_outlined,
+                                    selected:
+                                    _contactMethod ==
+                                        'Email',
+                                    onTap: () {
+                                      setState(() {
+                                        _contactMethod =
+                                        'Email';
+                                      });
+
+                                      field.didChange(
+                                        'Email',
+                                      );
+                                    },
+                                  ),
+                                  SelectionChip(
+                                    label: 'Phone',
+                                    icon: Icons
+                                        .phone_outlined,
+                                    selected:
+                                    _contactMethod ==
+                                        'Phone',
+                                    onTap: () {
+                                      setState(() {
+                                        _contactMethod =
+                                        'Phone';
+                                      });
+
+                                      field.didChange(
+                                        'Phone',
+                                      );
+                                    },
+                                  ),
+                                  SelectionChip(
+                                    label:
+                                    'Campus meeting',
+                                    icon: Icons
+                                        .groups_outlined,
+                                    selected:
+                                    _contactMethod ==
+                                        'Campus meeting',
+                                    onTap: () {
+                                      setState(() {
+                                        _contactMethod =
+                                        'Campus meeting';
+                                      });
+
+                                      field.didChange(
+                                        'Campus meeting',
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+
+                              if (field.hasError)
+                                Padding(
+                                  padding:
+                                  const EdgeInsets
+                                      .only(
+                                    top: 8,
+                                    left: 12,
+                                  ),
+                                  child: Text(
+                                    field.errorText!,
+                                    style:
+                                    const TextStyle(
+                                      color: iituRed,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 25),
+
+                      const Divider(),
+
+                      const SizedBox(height: 22),
+
+                      const FormMiniTitle(
+                        title:
+                        'Preferred response date',
+                        subtitle:
+                        'Choose a date that is not in the past.',
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      FormField<DateTime>(
+                        initialValue:
+                        _preferredDate,
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Please select a preferred response date.';
+                          }
+
+                          final today =
+                          DateTime.now();
+
+                          final startToday =
+                          DateTime(
+                            today.year,
+                            today.month,
+                            today.day,
+                          );
+
+                          final selected =
+                          DateTime(
+                            value.year,
+                            value.month,
+                            value.day,
+                          );
+
+                          if (selected.isBefore(
+                            startToday,
+                          )) {
+                            return 'The response date cannot be in the past.';
+                          }
+
+                          return null;
+                        },
+                        onSaved: (value) {
+                          _preferredDate =
+                              value;
+                        },
+                        builder: (field) {
+                          return Column(
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                            children: [
+                              InkWell(
+                                borderRadius:
+                                BorderRadius
+                                    .circular(
+                                  17,
+                                ),
+                                onTap: () {
+                                  _selectDate(
+                                    field,
+                                  );
+                                },
+                                child: Container(
+                                  width:
+                                  double.infinity,
+                                  padding:
+                                  const EdgeInsets
+                                      .symmetric(
+                                    horizontal: 18,
+                                    vertical: 17,
+                                  ),
+                                  decoration:
+                                  BoxDecoration(
+                                    color:
+                                    const Color(
+                                      0xFFF5F5F7,
+                                    ),
+                                    borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                      17,
+                                    ),
+                                    border:
+                                    Border.all(
+                                      color:
+                                      field.hasError
+                                          ? iituRed
+                                          : borderColor,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons
+                                            .calendar_month_outlined,
+                                        color:
+                                        greyText,
+                                      ),
+                                      const SizedBox(
+                                        width: 12,
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          _dateText(
+                                            _preferredDate,
+                                          ),
+                                          style:
+                                          TextStyle(
+                                            color:
+                                            _preferredDate ==
+                                                null
+                                                ? greyText
+                                                : darkText,
+                                            fontSize:
+                                            13,
+                                          ),
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons
+                                            .keyboard_arrow_down_rounded,
+                                        color:
+                                        greyText,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              if (field.hasError)
+                                Padding(
+                                  padding:
+                                  const EdgeInsets
+                                      .only(
+                                    top: 8,
+                                    left: 12,
+                                  ),
+                                  child: Text(
+                                    field.errorText!,
+                                    style:
+                                    const TextStyle(
+                                      color: iituRed,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                FormSectionCard(
+                  number: '04',
+                  title: 'Confirmation',
+                  subtitle:
+                  'Check your information before submitting the request.',
+                  child: FormField<bool>(
+                    initialValue: false,
+                    validator: (value) {
+                      if (value != true) {
+                        return 'Please confirm the information before submitting.';
+                      }
+
+                      return null;
+                    },
+                    builder: (field) {
+                      return Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                        children: [
+                          CheckboxListTile(
+                            value: _declaration,
+                            contentPadding:
+                            EdgeInsets.zero,
+                            controlAffinity:
+                            ListTileControlAffinity
+                                .leading,
+                            activeColor: iituRed,
+                            title: const Text(
+                              'I confirm that the information above is correct.',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight:
+                                FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              'The information will be used only to process this campus service request.',
+                              style: TextStyle(
+                                color: greyText,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                            onChanged: (value) {
+                              final selected =
+                                  value ?? false;
+
+                              setState(() {
+                                _declaration =
+                                    selected;
+                              });
+
+                              field.didChange(
+                                selected,
+                              );
+                            },
+                          ),
+
+                          if (field.hasError)
+                            Padding(
+                              padding:
+                              const EdgeInsets
+                                  .only(
+                                left: 12,
+                                top: 4,
+                              ),
+                              child: Text(
+                                field.errorText!,
+                                style:
+                                const TextStyle(
+                                  color: iituRed,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 25),
+
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _submitForm,
+                      style:
+                      ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: iituRed,
+                        foregroundColor:
+                        Colors.white,
+                        padding:
+                        const EdgeInsets.symmetric(
+                          horizontal: 25,
+                          vertical: 17,
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        size: 17,
+                      ),
+                      label: const Text(
+                        'Submit Request',
+                      ),
+                    ),
+
+                    OutlinedButton.icon(
+                      onPressed: _resetForm,
+                      style:
+                      OutlinedButton.styleFrom(
+                        foregroundColor:
+                        darkText,
+                        side: const BorderSide(
+                          color: borderColor,
+                        ),
+                        padding:
+                        const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 17,
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        size: 17,
+                      ),
+                      label: const Text(
+                        'Reset',
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (widget.lastRequest !=
+                    null) ...[
+                  const SizedBox(height: 42),
+
+                  LastRequestCard(
+                    request:
+                    widget.lastRequest!,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// EVENT DETAILS PAGE
+// ============================================================
+
+class EventDetailsPage extends StatefulWidget {
+  final CampusEvent event;
+
+  const EventDetailsPage({
+    super.key,
+    required this.event,
+  });
+
+  @override
+  State<EventDetailsPage> createState() =>
+      _EventDetailsPageState();
+}
+
+class _EventDetailsPageState
+    extends State<EventDetailsPage> {
+  bool _registered = false;
+
+  Future<void> _openRegistration() async {
+    final result =
+    await showDialog<bool>(
+      context: context,
+      builder: (
+          context,
+          ) {
+        return EventRegistrationDialog(
+          event: widget.event,
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      setState(() {
+        _registered = true;
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'You are registered for ${widget.event.title}.',
+          ),
+          backgroundColor: successGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(15),
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: pageBackground,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text(
+          'Event Details',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            24,
+            35,
+            24,
+            80,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints:
+              const BoxConstraints(
+                maxWidth: 1050,
+              ),
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 420,
+                    clipBehavior:
+                    Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      borderRadius:
+                      BorderRadius.circular(
+                        32,
+                      ),
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        AppImage(
+                          path:
+                          widget.event.image,
+                          fit: BoxFit.cover,
+                        ),
+                        Container(
+                          decoration:
+                          BoxDecoration(
+                            gradient:
+                            LinearGradient(
+                              begin: Alignment
+                                  .topCenter,
+                              end: Alignment
+                                  .bottomCenter,
+                              colors: [
+                                Colors
+                                    .transparent,
+                                Colors.black
+                                    .withOpacity(
+                                  0.72,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 32,
+                          right: 32,
+                          bottom: 32,
+                          child: Column(
+                            crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                            children: [
+                              Text(
+                                widget.event
+                                    .category
+                                    .toUpperCase(),
+                                style:
+                                const TextStyle(
+                                  color:
+                                  Colors.white70,
+                                  fontSize: 9,
+                                  letterSpacing:
+                                  1.4,
+                                  fontWeight:
+                                  FontWeight
+                                      .w600,
+                                ),
+                              ),
+                              const SizedBox(
+                                height: 10,
+                              ),
+                              Text(
+                                widget.event.title,
+                                style:
+                                const TextStyle(
+                                  color:
+                                  Colors.white,
+                                  fontSize: 36,
+                                  height: 1.06,
+                                  fontWeight:
+                                  FontWeight
+                                      .w600,
+                                  letterSpacing:
+                                  -1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      EventMetaChip(
+                        icon: Icons
+                            .calendar_month_outlined,
+                        text:
+                        widget.event.fullDate,
+                      ),
+                      EventMetaChip(
+                        icon: Icons
+                            .access_time_rounded,
+                        text:
+                        widget.event.time,
+                      ),
+                      EventMetaChip(
+                        icon: Icons
+                            .location_on_outlined,
+                        text:
+                        widget.event.location,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 34),
+
+                  LayoutBuilder(
+                    builder: (
+                        context,
+                        constraints,
+                        ) {
+                      final desktop =
+                          constraints.maxWidth >=
+                              760;
+
+                      final main =
+                      Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
+                        children: [
+                          const Text(
+                            'About the event',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight:
+                              FontWeight.w600,
+                              letterSpacing: -0.7,
+                            ),
+                          ),
+                          const SizedBox(height: 13),
+                          Text(
+                            widget.event
+                                .longDescription,
+                            style:
+                            const TextStyle(
+                              color: greyText,
+                              fontSize: 13,
+                              height: 1.75,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          const Text(
+                            'What to expect',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight:
+                              FontWeight.w600,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          ...widget
+                              .event.expectations
+                              .map(
+                                (
+                                item,
+                                ) =>
+                                Padding(
+                                  padding:
+                                  const EdgeInsets
+                                      .only(
+                                    bottom: 12,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 26,
+                                        height: 26,
+                                        alignment:
+                                        Alignment
+                                            .center,
+                                        decoration:
+                                        const BoxDecoration(
+                                          color:
+                                          softRed,
+                                          shape:
+                                          BoxShape
+                                              .circle,
+                                        ),
+                                        child:
+                                        const Icon(
+                                          Icons
+                                              .check_rounded,
+                                          color:
+                                          iituRed,
+                                          size: 15,
+                                        ),
+                                      ),
+                                      const SizedBox(
+                                        width: 11,
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          item,
+                                          style:
+                                          const TextStyle(
+                                            fontSize:
+                                            12.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                          ),
+                        ],
+                      );
+
+                      final registerCard =
+                      Container(
+                        padding:
+                        const EdgeInsets.all(
+                          24,
+                        ),
+                        decoration:
+                        BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                          BorderRadius.circular(
+                            25,
+                          ),
+                          border: Border.all(
+                            color:
+                            borderColor,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+                          children: [
+                            const Text(
+                              'Join this event',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight:
+                                FontWeight
+                                    .w600,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 8,
+                            ),
+                            const Text(
+                              'Register using your student details.',
+                              style: TextStyle(
+                                color:
+                                greyText,
+                                fontSize: 11.5,
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 20,
+                            ),
+                            SizedBox(
+                              width:
+                              double.infinity,
+                              child:
+                              ElevatedButton.icon(
+                                onPressed:
+                                _registered
+                                    ? null
+                                    : _openRegistration,
+                                style:
+                                ElevatedButton
+                                    .styleFrom(
+                                  elevation: 0,
+                                  backgroundColor:
+                                  iituRed,
+                                  foregroundColor:
+                                  Colors.white,
+                                  padding:
+                                  const EdgeInsets
+                                      .symmetric(
+                                    vertical: 15,
+                                  ),
+                                ),
+                                icon: Icon(
+                                  _registered
+                                      ? Icons
+                                      .check_circle_outline
+                                      : Icons
+                                      .how_to_reg_outlined,
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  _registered
+                                      ? 'Registered'
+                                      : 'Register for Event',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (!desktop) {
+                        return Column(
+                          children: [
+                            main,
+                            const SizedBox(
+                              height: 28,
+                            ),
+                            registerCard,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
+                        children: [
+                          Expanded(
+                            child: main,
+                          ),
+                          const SizedBox(width: 35),
+                          SizedBox(
+                            width: 300,
+                            child: registerCard,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// EVENT REGISTRATION FORM
+// ============================================================
+
+class EventRegistrationDialog
+    extends StatefulWidget {
+  final CampusEvent event;
+
+  const EventRegistrationDialog({
+    super.key,
+    required this.event,
+  });
+
+  @override
+  State<EventRegistrationDialog> createState() =>
+      _EventRegistrationDialogState();
+}
+
+class _EventRegistrationDialogState
+    extends State<EventRegistrationDialog> {
+  final GlobalKey<FormState> _formKey =
+  GlobalKey<FormState>();
+
+  final TextEditingController _nameController =
+  TextEditingController(
+    text: 'Akvarzhanova Irada',
+  );
+
+  final TextEditingController _idController =
+  TextEditingController(
+    text: '41151',
+  );
+
+  final TextEditingController _emailController =
+  TextEditingController(
+    text: 'irada41151@student.iitu.kz',
+  );
+
+  bool _confirm = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _idController.dispose();
+    _emailController.dispose();
+
+    super.dispose();
+  }
+
+  void _register() {
+    final valid =
+        _formKey.currentState?.validate() ??
+            false;
+
+    if (!valid) return;
+
+    if (!_confirm) {
+      setState(() {});
+
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      insetPadding:
+      const EdgeInsets.all(20),
+      shape: RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.circular(28),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 500,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: Form(
+            key: _formKey,
+            autovalidateMode:
+            AutovalidateMode
+                .onUserInteraction,
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'EVENT REGISTRATION',
+                  style: TextStyle(
+                    color: iituRed,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+
+                const SizedBox(height: 9),
+
+                Text(
+                  widget.event.title,
+                  style: const TextStyle(
+                    fontSize: 23,
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.7,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                TextFormField(
+                  controller:
+                  _nameController,
+                  decoration:
+                  const InputDecoration(
+                    labelText: 'Full name',
+                    prefixIcon: Icon(
+                      Icons.person_outline,
+                    ),
+                  ),
+                  validator: (value) {
+                    final text =
+                        value?.trim() ?? '';
+
+                    if (text.isEmpty ||
+                        !text.contains(' ')) {
+                      return 'Please enter your full name.';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 15),
+
+                TextFormField(
+                  controller:
+                  _idController,
+                  decoration:
+                  const InputDecoration(
+                    labelText: 'Student ID',
+                    prefixIcon: Icon(
+                      Icons.badge_outlined,
+                    ),
+                  ),
+                  validator: (value) {
+                    if ((value?.trim().length ??
+                        0) <
+                        5) {
+                      return 'Enter a valid Student ID.';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 15),
+
+                TextFormField(
+                  controller:
+                  _emailController,
+                  keyboardType:
+                  TextInputType.emailAddress,
+                  decoration:
+                  const InputDecoration(
+                    labelText: 'Campus email',
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                    ),
+                  ),
+                  validator: (value) {
+                    final email =
+                        value?.trim() ?? '';
+
+                    if (!email.contains(
+                      '@',
+                    )) {
+                      return 'Enter a valid email.';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 15),
+
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: softGrey,
+                    borderRadius:
+                    BorderRadius.circular(16),
+                  ),
+                  child: CheckboxListTile(
+                    contentPadding:
+                    EdgeInsets.zero,
+                    value: _confirm,
+                    activeColor: iituRed,
+                    controlAffinity:
+                    ListTileControlAffinity
+                        .leading,
+                    title: const Text(
+                      'I confirm my registration.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                        FontWeight.w500,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _confirm =
+                            value ?? false;
+                      });
+                    },
+                  ),
+                ),
+
+                if (!_confirm)
+                  const Padding(
+                    padding:
+                    EdgeInsets.only(
+                      top: 7,
+                      left: 10,
+                    ),
+                    child: Text(
+                      'Please confirm your registration.',
+                      style: TextStyle(
+                        color: iituRed,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 22),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(
+                            context,
+                          );
+                        },
+                        child:
+                        const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child:
+                      ElevatedButton(
+                        onPressed: _register,
+                        style:
+                        ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor:
+                          iituRed,
+                          foregroundColor:
+                          Colors.white,
+                        ),
+                        child:
+                        const Text('Register'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// HOME STUDENT SUPPORT PROMO
+// ============================================================
+
+class StudentSupportPromo
+    extends StatefulWidget {
+  final VoidCallback onOpenServices;
+  final VoidCallback onOpenStatus;
+  final bool hasRequest;
+
+  const StudentSupportPromo({
+    super.key,
+    required this.onOpenServices,
+    required this.onOpenStatus,
+    required this.hasRequest,
+  });
+
+  @override
+  State<StudentSupportPromo> createState() =>
+      _StudentSupportPromoState();
+}
+
+class _StudentSupportPromoState
+    extends State<StudentSupportPromo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        seconds: 4,
+      ),
+    )..repeat(
+      reverse: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        const PremiumHeading(
+          eyebrow: 'STUDENT SUPPORT',
+          title: 'Help when you need it.',
+          subtitle:
+          'Find the right campus service and submit a request without searching through departments.',
+        ),
+
+        const SizedBox(height: 38),
+
+        LayoutBuilder(
+          builder: (
+              context,
+              constraints,
+              ) {
+            final desktop =
+                constraints.maxWidth >= 900;
+
+            if (!desktop) {
+              return Column(
+                children: [
+                  _centerCard(),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SupportFeatureCard(
+                        icon:
+                        Icons.flash_on_outlined,
+                        title: 'Quick Help',
+                        text:
+                        'Find the right service quickly.',
+                        onTap:
+                        widget.onOpenServices,
+                      ),
+                      SupportFeatureCard(
+                        icon:
+                        Icons.report_problem_outlined,
+                        title: 'Common Issues',
+                        text:
+                        'Wi-Fi, ID, dormitory and documents.',
+                        onTap:
+                        widget.onOpenServices,
+                      ),
+                      SupportFeatureCard(
+                        icon:
+                        Icons.receipt_long_outlined,
+                        title:
+                        'Request Status',
+                        text: widget.hasRequest
+                            ? 'Your latest request is available.'
+                            : 'No submitted request yet.',
+                        onTap:
+                        widget.onOpenStatus,
+                      ),
+                      SupportFeatureCard(
+                        icon:
+                        Icons.support_agent_outlined,
+                        title:
+                        'Service Request',
+                        text:
+                        'Submit an issue online.',
+                        onTap:
+                        widget.onOpenServices,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  _mainButton(),
+                ],
+              );
+            }
+
+            return Container(
+              height: 500,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(
+                  0xFFFBFBFC,
+                ),
+                borderRadius:
+                BorderRadius.circular(34),
+                border: Border.all(
+                  color: borderColor,
+                ),
+              ),
+              child: AnimatedBuilder(
+                animation: controller,
+                builder: (
+                    context,
+                    child,
+                    ) {
+                  final float =
+                      math.sin(
+                        controller.value *
+                            math.pi,
+                      ) *
+                          7;
+
+                  return Stack(
+                    children: [
+                      Positioned(
+                        left: 44,
+                        top: 55,
+                        width: 245,
+                        child:
+                        SupportFeatureCard(
+                          icon: Icons
+                              .flash_on_outlined,
+                          title: 'Quick Help',
+                          text:
+                          'Find the right campus service quickly.',
+                          onTap: widget
+                              .onOpenServices,
+                        ),
+                      ),
+
+                      Positioned(
+                        left: 72,
+                        bottom: 76,
+                        width: 245,
+                        child:
+                        SupportFeatureCard(
+                          icon: Icons
+                              .report_problem_outlined,
+                          title:
+                          'Common Issues',
+                          text:
+                          'Wi-Fi, ID card, dormitory, documents and more.',
+                          onTap: widget
+                              .onOpenServices,
+                        ),
+                      ),
+
+                      Positioned(
+                        right: 45,
+                        top: 55,
+                        width: 245,
+                        child:
+                        SupportFeatureCard(
+                          icon: Icons
+                              .receipt_long_outlined,
+                          title:
+                          'Request Status',
+                          text: widget
+                              .hasRequest
+                              ? 'Check your latest submitted request.'
+                              : 'No active request yet.',
+                          onTap: widget
+                              .onOpenStatus,
+                        ),
+                      ),
+
+                      Positioned(
+                        right: 72,
+                        bottom: 76,
+                        width: 245,
+                        child:
+                        SupportFeatureCard(
+                          icon: Icons
+                              .support_agent_outlined,
+                          title:
+                          'Service Request',
+                          text:
+                          'Submit an issue online in a few steps.',
+                          onTap: widget
+                              .onOpenServices,
+                        ),
+                      ),
+
+                      Align(
+                        alignment:
+                        Alignment.center,
+                        child:
+                        Transform.translate(
+                          offset: Offset(
+                            0,
+                            -float,
+                          ),
+                          child:
+                          _centerCard(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 22),
+
+        Align(
+          alignment: Alignment.center,
+          child: _mainButton(),
+        ),
+      ],
+    );
+  }
+
+  Widget _centerCard() {
+    return Container(
+      width: 300,
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: borderColor,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.055),
+            blurRadius: 35,
+            offset: const Offset(
+              0,
+              16,
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            height: 32,
+            child: AppImage(
+              path:
+              'assets/images/iitu_logo.png',
+              fit: BoxFit.contain,
+              alignment:
+              Alignment.centerLeft,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          const Text(
+            'IITU Student Support',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          const Text(
+            'How can we help?',
+            style: TextStyle(
+              color: greyText,
+              fontSize: 11.5,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          const SupportMockRow(
+            icon: Icons.wifi_rounded,
+            text: 'Wi-Fi / Internet',
+          ),
+
+          const SupportMockRow(
+            icon: Icons.badge_outlined,
+            text: 'Student ID Card',
+          ),
+
+          const SupportMockRow(
+            icon:
+            Icons.description_outlined,
+            text: 'Academic Documents',
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed:
+              widget.onOpenServices,
+              style:
+              ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: iituRed,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text(
+                'Get Help',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mainButton() {
+    return ElevatedButton.icon(
+      onPressed: widget.onOpenServices,
+      style: ElevatedButton.styleFrom(
+        elevation: 0,
+        backgroundColor: iituRed,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 25,
+          vertical: 17,
+        ),
+      ),
+      icon: const Icon(
+        Icons.arrow_forward_rounded,
+        size: 17,
+      ),
+      label: const Text(
+        'Get Student Support',
+      ),
+    );
+  }
+}
+
+// ============================================================
 // DATA CLASSES
 // ============================================================
 
@@ -3759,29 +6348,51 @@ class CampusEvent {
   final String title;
   final String category;
   final String date;
+  final String fullDate;
   final String time;
   final String location;
   final String description;
+  final String longDescription;
   final String image;
+  final List<String> expectations;
 
   const CampusEvent({
     required this.title,
     required this.category,
     required this.date,
+    required this.fullDate,
     required this.time,
     required this.location,
     required this.description,
+    required this.longDescription,
     required this.image,
+    required this.expectations,
   });
 }
 
-class ReminderItem {
-  final String title;
-  final DateTime date;
+class ServiceRequestSummary {
+  final String reference;
+  final String studentName;
+  final String studentId;
+  final String email;
+  final String category;
+  final String subject;
+  final String details;
+  final String urgency;
+  final String contactMethod;
+  final String preferredDate;
 
-  const ReminderItem({
-    required this.title,
-    required this.date,
+  const ServiceRequestSummary({
+    required this.reference,
+    required this.studentName,
+    required this.studentId,
+    required this.email,
+    required this.category,
+    required this.subject,
+    required this.details,
+    required this.urgency,
+    required this.contactMethod,
+    required this.preferredDate,
   });
 }
 
@@ -3812,77 +6423,509 @@ class AcademicItem {
 }
 
 // ============================================================
-// COMPACT ACADEMIC VALUE
+// COMMON IMAGE
 // ============================================================
 
-class CompactAcademicValue
-    extends StatelessWidget {
-  final String label;
-  final String value;
+class AppImage extends StatelessWidget {
+  final String path;
+  final BoxFit fit;
+  final Alignment alignment;
 
-  const CompactAcademicValue({
+  const AppImage({
     super.key,
-    required this.label,
-    required this.value,
+    required this.path,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 90,
+    return Image.asset(
+      path,
+      fit: fit,
+      alignment: alignment,
+      errorBuilder: (
+          context,
+          error,
+          stackTrace,
+          ) {
+        return Container(
+          color: softGrey,
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.image_outlined,
+            color: greyText,
+            size: 32,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ============================================================
+// HEADINGS
+// ============================================================
+
+class PremiumHeading extends StatelessWidget {
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+
+  const PremiumHeading({
+    super.key,
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Text(
+          eyebrow,
+          style: const TextStyle(
+            color: iituRed,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            color: darkText,
+            fontSize: 34,
+            height: 1.12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -1.3,
+          ),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: greyText,
+            fontSize: 13,
+            height: 1.55,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// FORM SECTION
+// ============================================================
+
+class FormSectionCard extends StatelessWidget {
+  final String number;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const FormSectionCard({
+    super.key,
+    required this.number,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: borderColor,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.018),
+            blurRadius: 24,
+            offset: const Offset(
+              0,
+              9,
+            ),
+          ),
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: greyText,
-              fontSize: 8.5,
-              letterSpacing: 1,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: softRed,
+                  borderRadius:
+                  BorderRadius.circular(13),
+                ),
+                child: Text(
+                  number,
+                  style: const TextStyle(
+                    color: iituRed,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight:
+                        FontWeight.w600,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: greyText,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
-          ),
+          const SizedBox(height: 25),
+          child,
         ],
       ),
     );
   }
 }
 
-// ============================================================
-// PROFILE ACADEMIC CARD
-// ============================================================
+class FormMiniTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
 
-class AcademicMetricCard
-    extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String caption;
-
-  const AcademicMetricCard({
+  const FormMiniTitle({
     super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.caption,
+    required this.title,
+    required this.subtitle,
   });
 
   @override
-  State<AcademicMetricCard> createState() =>
-      _AcademicMetricCardState();
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: greyText,
+            fontSize: 10.5,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _AcademicMetricCardState
-    extends State<AcademicMetricCard> {
+// ============================================================
+// FORM CHIPS
+// ============================================================
+
+class SelectionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const SelectionChip({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius:
+      BorderRadius.circular(30),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 180,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        decoration: BoxDecoration(
+          color:
+          selected ? softRed : Colors.white,
+          borderRadius:
+          BorderRadius.circular(30),
+          border: Border.all(
+            color:
+            selected ? iituRed : borderColor,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color:
+              selected ? iituRed : greyText,
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(
+                color:
+                selected ? iituRed : darkText,
+                fontSize: 11.5,
+                fontWeight: selected
+                    ? FontWeight.w600
+                    : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class IssueQuickChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const IssueQuickChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius:
+      BorderRadius.circular(20),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 180,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color:
+          selected ? softRed : softGrey,
+          borderRadius:
+          BorderRadius.circular(20),
+          border: Border.all(
+            color:
+            selected ? iituRed : softGrey,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color:
+            selected ? iituRed : greyText,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// LAST REQUEST
+// ============================================================
+
+class LastRequestCard extends StatelessWidget {
+  final ServiceRequestSummary request;
+
+  const LastRequestCard({
+    super.key,
+    required this.request,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F8F5),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: const Color(0xFFCDE7D8),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (
+            context,
+            constraints,
+            ) {
+          final desktop =
+              constraints.maxWidth >= 650;
+
+          final copy = Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'LATEST REQUEST',
+                style: TextStyle(
+                  color: successGreen,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                request.category,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                request.reference,
+                style: const TextStyle(
+                  color: greyText,
+                  fontSize: 10.5,
+                ),
+              ),
+            ],
+          );
+
+          final badge = Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 9,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+              BorderRadius.circular(30),
+            ),
+            child: const Row(
+              mainAxisSize:
+              MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: successGreen,
+                  size: 16,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Submitted',
+                  style: TextStyle(
+                    color: successGreen,
+                    fontSize: 10,
+                    fontWeight:
+                    FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          if (!desktop) {
+            return Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                copy,
+                const SizedBox(height: 15),
+                badge,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: copy,
+              ),
+              badge,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================
+// SUPPORT PROMO PARTS
+// ============================================================
+
+class SupportFeatureCard
+    extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+  final VoidCallback onTap;
+
+  const SupportFeatureCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.onTap,
+  });
+
+  @override
+  State<SupportFeatureCard> createState() =>
+      _SupportFeatureCardState();
+}
+
+class _SupportFeatureCardState
+    extends State<SupportFeatureCard> {
   bool hover = false;
 
   @override
@@ -3898,81 +6941,364 @@ class _AcademicMetricCardState
           hover = false;
         });
       },
-      child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 180,
-        ),
-        height: 145,
-
-        // Explicit Container alignment.
-        alignment: Alignment.centerLeft,
-
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: hover
-              ? const Color(0xFFFFF6F7)
-              : const Color(0xFFF8F8FA),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color:
-            hover ? iituRed : borderColor,
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius:
+        BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
           ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            Row(
-              children: [
-                Icon(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius:
+            BorderRadius.circular(20),
+            border: Border.all(
+              color:
+              hover ? iituRed : borderColor,
+            ),
+            boxShadow: hover
+                ? [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(
+                  0.045,
+                ),
+                blurRadius: 20,
+                offset: const Offset(
+                  0,
+                  8,
+                ),
+              ),
+            ]
+                : [],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: softRed,
+                  borderRadius:
+                  BorderRadius.circular(13),
+                ),
+                child: Icon(
                   widget.icon,
-                  size: 17,
                   color: iituRed,
+                  size: 20,
                 ),
-                const SizedBox(width: 7),
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    color: greyText,
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1,
-                  ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                        FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.text,
+                      style: const TextStyle(
+                        color: greyText,
+                        fontSize: 9.5,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 13),
-
-            Text(
-              widget.value,
-              style: const TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -1,
               ),
-            ),
-
-            const SizedBox(height: 4),
-
-            Text(
-              widget.caption,
-              style: const TextStyle(
-                color: greyText,
-                fontSize: 10,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+class SupportMockRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const SupportMockRow({
+    super.key,
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: 9,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: iituRed,
+            size: 17,
+          ),
+          const SizedBox(width: 9),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ============================================================
-// HEADER NAVIGATION
+// EVENT CARD
+// ============================================================
+
+class EventPageCard extends StatefulWidget {
+  final CampusEvent event;
+  final VoidCallback onTap;
+
+  const EventPageCard({
+    super.key,
+    required this.event,
+    required this.onTap,
+  });
+
+  @override
+  State<EventPageCard> createState() =>
+      _EventPageCardState();
+}
+
+class _EventPageCardState
+    extends State<EventPageCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius:
+        BorderRadius.circular(26),
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 200,
+          ),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius:
+            BorderRadius.circular(26),
+            border: Border.all(
+              color:
+              hover ? iituRed : borderColor,
+            ),
+            boxShadow: hover
+                ? [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(
+                  0.05,
+                ),
+                blurRadius: 28,
+                offset: const Offset(
+                  0,
+                  12,
+                ),
+              ),
+            ]
+                : [],
+          ),
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 215,
+                width: double.infinity,
+                child: HoverImage(
+                  image:
+                  widget.event.image,
+                ),
+              ),
+
+              Padding(
+                padding:
+                const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          widget.event.date,
+                          style:
+                          const TextStyle(
+                            color: iituRed,
+                            fontSize: 9,
+                            fontWeight:
+                            FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          widget.event.category
+                              .toUpperCase(),
+                          style:
+                          const TextStyle(
+                            color: greyText,
+                            fontSize: 8.5,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    Text(
+                      widget.event.title,
+                      style: const TextStyle(
+                        fontSize: 19,
+                        height: 1.15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 11),
+
+                    Text(
+                      widget.event.description,
+                      maxLines: 3,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: greyText,
+                        fontSize: 11.5,
+                        height: 1.55,
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    Row(
+                      children: [
+                        const Text(
+                          'View Event',
+                          style: TextStyle(
+                            color: iituRed,
+                            fontSize: 11,
+                            fontWeight:
+                            FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        AnimatedRotation(
+                          turns:
+                          hover ? 0.04 : 0,
+                          duration:
+                          const Duration(
+                            milliseconds: 180,
+                          ),
+                          child: const Icon(
+                            Icons.north_east,
+                            color: iituRed,
+                            size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class EventMetaChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const EventMetaChip({
+    super.key,
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: iituRed,
+            size: 16,
+          ),
+          const SizedBox(width: 7),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// HEADER
 // ============================================================
 
 class HeaderNavButton extends StatefulWidget {
@@ -4022,7 +7348,7 @@ class _HeaderNavButtonState
             right: 7,
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: 18,
+            horizontal: 17,
             vertical: 10,
           ),
           decoration: BoxDecoration(
@@ -4043,7 +7369,7 @@ class _HeaderNavButtonState
               color: highlighted
                   ? iituRed
                   : darkText,
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: FontWeight.w500,
               letterSpacing: -0.2,
             ),
@@ -4094,71 +7420,79 @@ class _HeaderIconButtonState
           foregroundColor:
           hover ? iituRed : darkText,
         ),
-        icon: Icon(widget.icon),
+        icon: Icon(
+          widget.icon,
+        ),
       ),
     );
   }
 }
 
 // ============================================================
-// HEADINGS
+// ANIMATIONS
 // ============================================================
 
-class PremiumHeading extends StatelessWidget {
-  final String eyebrow;
-  final String title;
-  final String subtitle;
+class RevealAfterDelay
+    extends StatefulWidget {
+  final Widget child;
+  final int delay;
 
-  const PremiumHeading({
+  const RevealAfterDelay({
     super.key,
-    required this.eyebrow,
-    required this.title,
-    required this.subtitle,
+    required this.child,
+    required this.delay,
   });
 
   @override
+  State<RevealAfterDelay> createState() =>
+      _RevealAfterDelayState();
+}
+
+class _RevealAfterDelayState
+    extends State<RevealAfterDelay> {
+  bool visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    Future.delayed(
+      Duration(
+        milliseconds: widget.delay,
+      ),
+          () {
+        if (mounted) {
+          setState(() {
+            visible = true;
+          });
+        }
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-      children: [
-        Text(
-          eyebrow,
-          style: const TextStyle(
-            color: iituRed,
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.5,
-          ),
+    return AnimatedSlide(
+      duration: const Duration(
+        milliseconds: 500,
+      ),
+      curve: Curves.easeOutCubic,
+      offset: visible
+          ? Offset.zero
+          : const Offset(
+        0,
+        0.12,
+      ),
+      child: AnimatedOpacity(
+        duration: const Duration(
+          milliseconds: 420,
         ),
-        const SizedBox(height: 10),
-        Text(
-          title,
-          style: const TextStyle(
-            color: darkText,
-            fontSize: 33,
-            height: 1.12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -1.2,
-          ),
-        ),
-        const SizedBox(height: 9),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: greyText,
-            fontSize: 13,
-            height: 1.5,
-          ),
-        ),
-      ],
+        opacity: visible ? 1 : 0,
+        child: widget.child,
+      ),
     );
   }
 }
-
-// ============================================================
-// REVEAL ANIMATION
-// ============================================================
 
 class SimpleReveal extends StatelessWidget {
   final Widget child;
@@ -4174,7 +7508,7 @@ class SimpleReveal extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       duration: Duration(
-        milliseconds: 650 + delay,
+        milliseconds: 620 + delay,
       ),
       curve: Curves.easeOutCubic,
       tween: Tween(
@@ -4191,13 +7525,50 @@ class SimpleReveal extends StatelessWidget {
           child: Transform.translate(
             offset: Offset(
               0,
-              27 * (1 - value),
+              28 * (1 - value),
             ),
             child: widget,
           ),
         );
       },
       child: child,
+    );
+  }
+}
+
+class AnimatedHeroImage extends StatelessWidget {
+  final String image;
+
+  const AnimatedHeroImage({
+    super.key,
+    required this.image,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(
+        seconds: 4,
+      ),
+      curve: Curves.easeOut,
+      tween: Tween(
+        begin: 1.055,
+        end: 1,
+      ),
+      builder: (
+          context,
+          scale,
+          child,
+          ) {
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
+      child: AppImage(
+        path: image,
+        fit: BoxFit.cover,
+      ),
     );
   }
 }
@@ -4312,8 +7683,8 @@ class _HoverImageState
           ),
           curve: Curves.easeOutCubic,
           scale: hover ? 1.04 : 1,
-          child: Image.asset(
-            widget.image,
+          child: AppImage(
+            path: widget.image,
             fit: BoxFit.cover,
           ),
         ),
@@ -4323,48 +7694,158 @@ class _HoverImageState
 }
 
 // ============================================================
-// HERO IMAGE ANIMATION
+// ACADEMIC VALUE
 // ============================================================
 
-class AnimatedHeroImage extends StatelessWidget {
-  final String image;
+class CompactAcademicValue
+    extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const AnimatedHeroImage({
+  const CompactAcademicValue({
     super.key,
-    required this.image,
+    required this.label,
+    required this.value,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(
-        seconds: 3,
+    return SizedBox(
+      width: 90,
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: greyText,
+              fontSize: 8.5,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
       ),
-      curve: Curves.easeOut,
-      tween: Tween(
-        begin: 1.045,
-        end: 1,
-      ),
-      builder: (
-          context,
-          scale,
-          child,
-          ) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
+    );
+  }
+}
+
+class AcademicMetricCard
+    extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String caption;
+
+  const AcademicMetricCard({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.caption,
+  });
+
+  @override
+  State<AcademicMetricCard> createState() =>
+      _AcademicMetricCardState();
+}
+
+class _AcademicMetricCardState
+    extends State<AcademicMetricCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
       },
-      child: Image.asset(
-        image,
-        fit: BoxFit.cover,
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 180,
+        ),
+        height: 145,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: hover
+              ? const Color(0xFFFFF6F7)
+              : const Color(0xFFF8F8FA),
+          borderRadius:
+          BorderRadius.circular(20),
+          border: Border.all(
+            color:
+            hover ? iituRed : borderColor,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  size: 17,
+                  color: iituRed,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  widget.label,
+                  style: const TextStyle(
+                    color: greyText,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 13),
+            Text(
+              widget.value,
+              style: const TextStyle(
+                fontSize: 27,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.caption,
+              style: const TextStyle(
+                color: greyText,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ============================================================
-// STUDENT HUB
+// ORBIT HUB
 // ============================================================
 
 class OrbitHub extends StatefulWidget {
@@ -4390,10 +7871,6 @@ class _OrbitHubState extends State<OrbitHub>
       Icons.calendar_today_outlined,
     ),
     OrbitItemData(
-      'Courses',
-      Icons.menu_book_outlined,
-    ),
-    OrbitItemData(
       'Library',
       Icons.local_library_outlined,
     ),
@@ -4408,6 +7885,10 @@ class _OrbitHubState extends State<OrbitHub>
     OrbitItemData(
       'Events',
       Icons.groups_outlined,
+    ),
+    OrbitItemData(
+      'Services',
+      Icons.support_agent_outlined,
     ),
   ];
 
@@ -4473,9 +7954,14 @@ class _OrbitHubState extends State<OrbitHub>
                       mainAxisAlignment:
                       MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/images/iitu_logo.png',
+                        SizedBox(
                           width: 94,
+                          height: 42,
+                          child: AppImage(
+                            path:
+                            'assets/images/iitu_logo.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         const Text(
@@ -4642,7 +8128,7 @@ class _OrbitButtonState
 }
 
 // ============================================================
-// ANNOUNCEMENT ANIMATION
+// ANNOUNCEMENT VISUALS
 // ============================================================
 
 enum AnnouncementVisualMode {
@@ -4752,9 +8238,14 @@ class _AnnouncementMotionVisualState
                 ),
               ],
             ),
-            child: Image.asset(
-              'assets/images/iitu_logo.png',
+            child: SizedBox(
               width: 57,
+              height: 35,
+              child: AppImage(
+                path:
+                'assets/images/iitu_logo.png',
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ),
@@ -5122,8 +8613,8 @@ class _CampusVisualCardState
                 milliseconds: 450,
               ),
               scale: hover ? 1.045 : 1,
-              child: Image.asset(
-                widget.image,
+              child: AppImage(
+                path: widget.image,
                 fit: BoxFit.cover,
               ),
             ),
@@ -5151,7 +8642,8 @@ class _CampusVisualCardState
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
                 children: [
-                  if (widget.number != null) ...[
+                  if (widget.number !=
+                      null) ...[
                     Text(
                       widget.number!,
                       style: const TextStyle(
@@ -5162,6 +8654,7 @@ class _CampusVisualCardState
                     ),
                     const SizedBox(height: 7),
                   ],
+
                   Text(
                     widget.title,
                     style: const TextStyle(
@@ -5171,7 +8664,9 @@ class _CampusVisualCardState
                       letterSpacing: -0.5,
                     ),
                   ),
+
                   const SizedBox(height: 6),
+
                   Text(
                     widget.subtitle,
                     style: const TextStyle(
