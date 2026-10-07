@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /campusRequests/{requestId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll([
+          'ownerUid', 'studentName', 'studentId', 'email', 'phone',
+          'serviceCategory', 'subject', 'description', 'urgency',
+          'preferredContact', 'preferredDate', 'declaration',
+          'status', 'createdAt'])
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'studentName', 'studentId', 'email', 'phone',
+          'serviceCategory', 'subject', 'description', 'urgency',
+          'preferredContact', 'preferredDate', 'declaration',
+          'status', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.studentName is string
+        && request.resource.data.studentName.size() >= 3
+        && request.resource.data.studentName.size() <= 100
+        && request.resource.data.studentId is string
+        && request.resource.data.studentId.size() >= 3
+        && request.resource.data.studentId.size() <= 30
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 150
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 25
+        && request.resource.data.serviceCategory is string
+        && request.resource.data.serviceCategory.size() > 0
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() >= 5
+        && request.resource.data.subject.size() <= 100
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 20
+        && request.resource.data.description.size() <= 500
+        && request.resource.data.urgency in ['Low', 'Normal', 'High']
+        && request.resource.data.preferredContact in ['Email', 'Phone']
+        && (request.resource.data.preferredContact != 'Phone'
+          || request.resource.data.phone.size() > 0)
+        && request.resource.data.preferredDate is timestamp
+        && request.resource.data.declaration == true
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.createdAt == request.time;
+
+      allow read: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+  }
+}

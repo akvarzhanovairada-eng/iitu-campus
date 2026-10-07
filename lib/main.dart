@@ -1,9 +1,92 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
-  runApp(const IITUCampusApp());
+import 'firebase_options.dart';
+
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    runApp(const IITUCampusApp());
+  } catch (error) {
+    runApp(
+      FirebaseStartupErrorApp(
+        message: error.toString(),
+      ),
+    );
+  }
+}
+
+class FirebaseStartupErrorApp extends StatelessWidget {
+  final String message;
+
+  const FirebaseStartupErrorApp({
+    super.key,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF7F7F9),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints:
+              const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.cloud_off_rounded,
+                      size: 48,
+                      color: Color(0xFFB71930),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Firebase could not start',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Check the Firebase configuration and your internet connection, then restart the app.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    SelectableText(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF74777F),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================================
@@ -3528,17 +3611,17 @@ class _ServicesScreenState
 
   final TextEditingController _nameController =
   TextEditingController(
-    text: 'Akvarzhanova Irada',
+    text: 'Amina Rahman',
   );
 
   final TextEditingController _idController =
   TextEditingController(
-    text: '41151',
+    text: 'S204198',
   );
 
   final TextEditingController _emailController =
   TextEditingController(
-    text: 'irada41151@student.iitu.kz',
+    text: 'amina.rahman@student.iitu.kz',
   );
 
   final TextEditingController _phoneController =
@@ -3558,6 +3641,20 @@ class _ServicesScreenState
   String? _contactMethod;
   DateTime? _preferredDate;
   bool _declaration = false;
+
+  // Values populated by FormState.save() before the Firestore write.
+  String _studentName = '';
+  String _studentId = '';
+  String _email = '';
+  String _phone = '';
+  String _subject = '';
+  String _description = '';
+
+  // Firebase submission state.
+  bool _isSubmitting = false;
+  String? _submissionPhase;
+  String? _lastRequestId;
+  Timer? _pendingSyncTimer;
 
   static const serviceCategories = [
     'Lost Student ID Card',
@@ -3604,6 +3701,7 @@ class _ServicesScreenState
 
   @override
   void dispose() {
+    _pendingSyncTimer?.cancel();
     _nameController.dispose();
     _idController.dispose();
     _emailController.dispose();
@@ -3744,7 +3842,12 @@ class _ServicesScreenState
     }
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
+    // Prevent duplicate Firestore writes from repeated taps.
+    if (_isSubmitting || _lastRequestId != null) {
+      return;
+    }
+
     final valid =
         _formKey.currentState?.validate() ??
             false;
@@ -3753,9 +3856,161 @@ class _ServicesScreenState
       return;
     }
 
+    // save() runs the onSaved callbacks of the TextFormField widgets.
     _formKey.currentState!.save();
 
-    showDialog(
+    if (_preferredDate == null ||
+        !_declaration ||
+        _category == null ||
+        _urgency == null ||
+        _contactMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please complete the date, choices and declaration.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _submissionPhase = 'Saving...';
+    });
+
+    // If a network write takes longer, keep waiting for the same document
+    // reference and show Pending sync instead of reporting false success.
+    _pendingSyncTimer?.cancel();
+    _pendingSyncTimer = Timer(
+      const Duration(seconds: 4),
+          () {
+        if (mounted && _isSubmitting) {
+          setState(() {
+            _submissionPhase = 'Pending sync...';
+          });
+        }
+      },
+    );
+
+    try {
+      final auth = FirebaseAuth.instance;
+      final user = auth.currentUser ??
+          (await auth.signInAnonymously()).user;
+
+      if (user == null) {
+        throw StateError(
+          'Anonymous sign-in was not completed.',
+        );
+      }
+
+      final ref = FirebaseFirestore.instance
+          .collection('campusRequests')
+          .doc();
+
+      var storedDescription = _description.trim();
+      if (_category == 'Other' &&
+          _otherController.text.trim().isNotEmpty) {
+        storedDescription =
+        'Other issue: ${_otherController.text.trim()}\n$storedDescription';
+      }
+
+      await ref.set({
+        'ownerUid': user.uid,
+        'studentName': _studentName.trim(),
+        'studentId': _studentId.trim(),
+        'email': _email.trim(),
+        'phone': _phone.trim(),
+        'serviceCategory': _category!,
+        'subject': _subject.trim(),
+        'description': storedDescription,
+        'urgency': _urgency!,
+        'preferredContact': _contactMethod!,
+        'preferredDate':
+        Timestamp.fromDate(_preferredDate!),
+        'declaration': _declaration,
+        'status': 'submitted',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      _pendingSyncTimer?.cancel();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _lastRequestId = ref.id;
+        _submissionPhase = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Submitted. Reference: ${ref.id}',
+          ),
+          backgroundColor: successGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      await _showSubmissionSuccessDialog(ref.id);
+    } on FirebaseException catch (error) {
+      _pendingSyncTimer?.cancel();
+
+      if (!mounted) {
+        return;
+      }
+
+      final message =
+      error.code == 'permission-denied'
+          ? 'Access denied. Check sign-in and database rules.'
+          : error.code == 'operation-not-allowed'
+          ? 'Anonymous sign-in is not enabled in Firebase.'
+          : 'Submission failed. Keep your inputs and try again.';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      _pendingSyncTimer?.cancel();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to submit the request.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      _pendingSyncTimer?.cancel();
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submissionPhase = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _showSubmissionSuccessDialog(
+      String requestId,
+      ) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
       context: context,
       builder: (
           dialogContext,
@@ -3787,34 +4042,377 @@ class _ServicesScreenState
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              SummaryLine(
-                label: 'Issue',
-                value:
-                _category ?? '-',
-              ),
-              SummaryLine(
-                label: 'Urgency',
-                value:
-                _urgency ?? '-',
-              ),
-              SummaryLine(
-                label: 'Contact',
-                value:
-                _contactMethod ?? '-',
-              ),
-              SummaryLine(
-                label: 'Preferred date',
-                value:
-                _formatDate(
-                  _preferredDate,
+          content: ConstrainedBox(
+            constraints:
+            const BoxConstraints(maxWidth: 430),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding:
+                  const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color:
+                    const Color(0xFFEAF7F0),
+                    borderRadius:
+                    BorderRadius.circular(15),
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'REQUEST REFERENCE',
+                        style: TextStyle(
+                          color: successGreen,
+                          fontSize: 9.5,
+                          fontWeight:
+                          FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      SelectableText(
+                        requestId,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                          FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 14),
+                SummaryLine(
+                  label: 'Issue',
+                  value: _category ?? '-',
+                ),
+                SummaryLine(
+                  label: 'Subject',
+                  value: _subject,
+                ),
+                SummaryLine(
+                  label: 'Urgency',
+                  value: _urgency ?? '-',
+                ),
+                SummaryLine(
+                  label: 'Contact',
+                  value: _contactMethod ?? '-',
+                ),
+                SummaryLine(
+                  label: 'Preferred date',
+                  value:
+                  _formatDate(_preferredDate),
+                ),
+                const SummaryLine(
+                  label: 'Status',
+                  value: 'submitted',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Done'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _loadAndShowRequest(requestId);
+              },
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: iituRed,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(
+                Icons.cloud_download_outlined,
+                size: 17,
+              ),
+              label: const Text(
+                'View Saved Request',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _formatStoredDate(
+      dynamic value,
+      ) {
+    if (value is Timestamp) {
+      return _formatDate(value.toDate());
+    }
+
+    if (value is DateTime) {
+      return _formatDate(value);
+    }
+
+    return '-';
+  }
+
+  Future<Map<String, dynamic>?> _loadRequest(
+      String requestId,
+      ) async {
+    final auth = FirebaseAuth.instance;
+    final user = auth.currentUser ??
+        (await auth.signInAnonymously()).user;
+
+    if (user == null) {
+      throw StateError(
+        'Anonymous sign-in was not completed.',
+      );
+    }
+
+    final snapshot = await FirebaseFirestore
+        .instance
+        .collection('campusRequests')
+        .doc(requestId)
+        .get(
+      const GetOptions(
+        source: Source.server,
+      ),
+    );
+
+    return snapshot.data();
+  }
+
+  Future<void> _loadAndShowRequest(
+      String requestId,
+      ) async {
+    final cleanId = requestId.trim();
+
+    if (cleanId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter a request reference.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Loading saved request from Firestore...',
+        ),
+        duration: Duration(milliseconds: 900),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    try {
+      final data = await _loadRequest(cleanId);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (data == null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No request was found with this reference.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (
+            dialogContext,
+            ) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+              BorderRadius.circular(27),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.cloud_done_outlined,
+                  color: successGreen,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Saved Request',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            content: ConstrainedBox(
+              constraints:
+              const BoxConstraints(
+                maxWidth: 430,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  SummaryLine(
+                    label: 'Reference',
+                    value: cleanId,
+                  ),
+                  SummaryLine(
+                    label: 'Service',
+                    value:
+                    '${data['serviceCategory'] ?? '-'}',
+                  ),
+                  SummaryLine(
+                    label: 'Subject',
+                    value:
+                    '${data['subject'] ?? '-'}',
+                  ),
+                  SummaryLine(
+                    label: 'Status',
+                    value:
+                    '${data['status'] ?? '-'}',
+                  ),
+                  SummaryLine(
+                    label: 'Preferred date',
+                    value: _formatStoredDate(
+                      data['preferredDate'],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding:
+                    const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                      const Color(0xFFEAF7F0),
+                      borderRadius:
+                      BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.verified_rounded,
+                          color: successGreen,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Retrieved directly from the Firestore server.',
+                            style: TextStyle(
+                              color:
+                              successGreen,
+                              fontSize: 10.5,
+                              fontWeight:
+                              FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(
+                    dialogContext,
+                  );
+                },
+                child: const Text('Close'),
               ),
             ],
+          );
+        },
+      );
+    } on FirebaseException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final message =
+      error.code == 'permission-denied'
+          ? 'This request cannot be read by the current anonymous user.'
+          : 'Could not retrieve the saved request from the server.';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not retrieve the saved request.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showRetrieveRequestDialog() async {
+    final controller =
+    TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (
+          dialogContext,
+          ) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(24),
+          ),
+          title: const Text(
+            'Retrieve saved request',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration:
+              const InputDecoration(
+                labelText:
+                'Request reference',
+                hintText:
+                'Paste the Firestore document ID',
+                prefixIcon: Icon(
+                  Icons.tag_rounded,
+                ),
+              ),
+            ),
           ),
           actions: [
             TextButton(
@@ -3823,22 +4421,49 @@ class _ServicesScreenState
                   dialogContext,
                 );
               },
-              child: const Text('Done'),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final requestId =
+                controller.text.trim();
+
+                Navigator.pop(
+                  dialogContext,
+                );
+
+                if (requestId.isNotEmpty) {
+                  _loadAndShowRequest(
+                    requestId,
+                  );
+                }
+              },
+              style:
+              ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: iituRed,
+                foregroundColor:
+                Colors.white,
+              ),
+              child: const Text('Retrieve'),
             ),
           ],
         );
       },
     );
+
+    controller.dispose();
   }
 
   void _resetForm() {
     _formKey.currentState?.reset();
 
+    // Reset starts a new request but does not delete the saved Firestore document.
     _nameController.text =
-    'Akvarzhanova Irada';
-    _idController.text = '41151';
+    'Amina Rahman';
+    _idController.text = 'S204198';
     _emailController.text =
-    'irada41151@student.iitu.kz';
+    'amina.rahman@student.iitu.kz';
 
     _phoneController.clear();
     _subjectController.clear();
@@ -3851,6 +4476,16 @@ class _ServicesScreenState
       _contactMethod = null;
       _preferredDate = null;
       _declaration = false;
+
+      _studentName = '';
+      _studentId = '';
+      _email = '';
+      _phone = '';
+      _subject = '';
+      _description = '';
+
+      _lastRequestId = null;
+      _submissionPhase = null;
     });
   }
 
@@ -3943,275 +4578,400 @@ class _ServicesScreenState
 
               const SizedBox(height: 28),
 
-              Form(
-                key: _formKey,
-                autovalidateMode:
-                AutovalidateMode
-                    .onUserInteraction,
-                child: Column(
-                  children: [
-                    Container(
-                      padding:
-                      const EdgeInsets.all(
-                        21,
-                      ),
-                      decoration:
-                      BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                        BorderRadius.circular(
-                          23,
+              AbsorbPointer(
+                absorbing: _isSubmitting,
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode:
+                  AutovalidateMode
+                      .onUserInteraction,
+                  child: Column(
+                    children: [
+                      Container(
+                        padding:
+                        const EdgeInsets.all(
+                          21,
                         ),
-                        border: Border.all(
-                          color: borderColor,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'Request completion',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight:
-                                  FontWeight
-                                      .w600,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '$progress%',
-                                style:
-                                const TextStyle(
-                                  color: iituRed,
-                                  fontSize: 11,
-                                  fontWeight:
-                                  FontWeight
-                                      .w600,
-                                ),
-                              ),
-                            ],
+                        decoration:
+                        BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                          BorderRadius.circular(
+                            23,
                           ),
-                          const SizedBox(height: 12),
-                          TweenAnimationBuilder<
-                              double>(
-                            duration:
-                            const Duration(
-                              milliseconds: 320,
-                            ),
-                            tween: Tween(
-                              begin: 0,
-                              end: _progress,
-                            ),
-                            builder: (
-                                context,
-                                value,
-                                child,
-                                ) {
-                              return ClipRRect(
-                                borderRadius:
-                                BorderRadius
-                                    .circular(
-                                  20,
+                          border: Border.all(
+                            color: borderColor,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Text(
+                                  'Request completion',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight:
+                                    FontWeight
+                                        .w600,
+                                  ),
                                 ),
-                                child:
-                                LinearProgressIndicator(
-                                  value: value,
-                                  minHeight: 7,
-                                  color: iituRed,
-                                  backgroundColor:
-                                  softGrey,
+                                const Spacer(),
+                                Text(
+                                  '$progress%',
+                                  style:
+                                  const TextStyle(
+                                    color: iituRed,
+                                    fontSize: 11,
+                                    fontWeight:
+                                    FontWeight
+                                        .w600,
+                                  ),
                                 ),
-                              );
-                            },
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            TweenAnimationBuilder<
+                                double>(
+                              duration:
+                              const Duration(
+                                milliseconds: 320,
+                              ),
+                              tween: Tween(
+                                begin: 0,
+                                end: _progress,
+                              ),
+                              builder: (
+                                  context,
+                                  value,
+                                  child,
+                                  ) {
+                                return ClipRRect(
+                                  borderRadius:
+                                  BorderRadius
+                                      .circular(
+                                    20,
+                                  ),
+                                  child:
+                                  LinearProgressIndicator(
+                                    value: value,
+                                    minHeight: 7,
+                                    color: iituRed,
+                                    backgroundColor:
+                                    softGrey,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      FormSection(
+                        number: '01',
+                        title:
+                        'Student details',
+                        child:
+                        _studentFields(),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      FormSection(
+                        number: '02',
+                        title:
+                        'Request details',
+                        child:
+                        _requestFields(),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      FormSection(
+                        number: '03',
+                        title:
+                        'Preferences',
+                        child:
+                        _preferenceFields(),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      FormSection(
+                        number: '04',
+                        title:
+                        'Confirmation',
+                        child: Column(
+                          children: [
+                            FormField<bool>(
+                              initialValue:
+                              false,
+                              validator:
+                                  (value) {
+                                if (value !=
+                                    true) {
+                                  return 'Please confirm the information.';
+                                }
+
+                                return null;
+                              },
+                              builder:
+                                  (field) {
+                                return Column(
+                                  crossAxisAlignment:
+                                  CrossAxisAlignment
+                                      .start,
+                                  children: [
+                                    CheckboxListTile(
+                                      value:
+                                      _declaration,
+                                      activeColor:
+                                      iituRed,
+                                      contentPadding:
+                                      EdgeInsets
+                                          .zero,
+                                      controlAffinity:
+                                      ListTileControlAffinity
+                                          .leading,
+                                      title:
+                                      const Text(
+                                        'I confirm that the information above is correct.',
+                                        style:
+                                        TextStyle(
+                                          fontSize:
+                                          12,
+                                          fontWeight:
+                                          FontWeight
+                                              .w500,
+                                        ),
+                                      ),
+                                      onChanged:
+                                          (value) {
+                                        final selected =
+                                            value ??
+                                                false;
+
+                                        setState(
+                                                () {
+                                              _declaration =
+                                                  selected;
+                                            });
+
+                                        field
+                                            .didChange(
+                                          selected,
+                                        );
+                                      },
+                                    ),
+
+                                    if (field
+                                        .hasError)
+                                      Text(
+                                        field
+                                            .errorText!,
+                                        style:
+                                        const TextStyle(
+                                          color:
+                                          iituRed,
+                                          fontSize:
+                                          10.5,
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      Wrap(
+                        spacing: 11,
+                        runSpacing: 11,
+                        crossAxisAlignment:
+                        WrapCrossAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed:
+                            _isSubmitting ||
+                                _lastRequestId !=
+                                    null
+                                ? null
+                                : _submitForm,
+                            style:
+                            ElevatedButton
+                                .styleFrom(
+                              elevation: 0,
+                              backgroundColor:
+                              iituRed,
+                              foregroundColor:
+                              Colors.white,
+                              padding:
+                              const EdgeInsets
+                                  .symmetric(
+                                horizontal: 22,
+                                vertical: 16,
+                              ),
+                            ),
+                            icon: _isSubmitting
+                                ? const SizedBox(
+                              width: 17,
+                              height: 17,
+                              child:
+                              CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color:
+                                Colors.white,
+                              ),
+                            )
+                                : const Icon(
+                              Icons.send_rounded,
+                              size: 17,
+                            ),
+                            label: Text(
+                              _isSubmitting
+                                  ? (_submissionPhase ??
+                                  'Saving...')
+                                  : _lastRequestId !=
+                                  null
+                                  ? 'Submitted'
+                                  : 'Submit Request',
+                            ),
+                          ),
+
+                          OutlinedButton.icon(
+                            onPressed:
+                            _isSubmitting
+                                ? null
+                                : _resetForm,
+                            style:
+                            OutlinedButton
+                                .styleFrom(
+                              foregroundColor:
+                              darkText,
+                              padding:
+                              const EdgeInsets
+                                  .symmetric(
+                                horizontal: 22,
+                                vertical: 16,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons
+                                  .refresh_rounded,
+                              size: 17,
+                            ),
+                            label: const Text(
+                              'Reset',
+                            ),
+                          ),
+
+                          TextButton.icon(
+                            onPressed:
+                            _isSubmitting
+                                ? null
+                                : _showRetrieveRequestDialog,
+                            icon: const Icon(
+                              Icons
+                                  .cloud_download_outlined,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Retrieve request',
+                            ),
                           ),
                         ],
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
-
-                    FormSection(
-                      number: '01',
-                      title:
-                      'Student details',
-                      child:
-                      _studentFields(),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    FormSection(
-                      number: '02',
-                      title:
-                      'Request details',
-                      child:
-                      _requestFields(),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    FormSection(
-                      number: '03',
-                      title:
-                      'Preferences',
-                      child:
-                      _preferenceFields(),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    FormSection(
-                      number: '04',
-                      title:
-                      'Confirmation',
-                      child: Column(
-                        children: [
-                          FormField<bool>(
-                            initialValue:
-                            false,
-                            validator:
-                                (value) {
-                              if (value !=
-                                  true) {
-                                return 'Please confirm the information.';
-                              }
-
-                              return null;
-                            },
-                            builder:
-                                (field) {
-                              return Column(
+                      if (_lastRequestId != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding:
+                          const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color:
+                            const Color(0xFFEAF7F0),
+                            borderRadius:
+                            BorderRadius.circular(
+                              18,
+                            ),
+                            border: Border.all(
+                              color: successGreen
+                                  .withOpacity(0.16),
+                            ),
+                          ),
+                          child: Wrap(
+                            spacing: 16,
+                            runSpacing: 12,
+                            crossAxisAlignment:
+                            WrapCrossAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons
+                                    .verified_rounded,
+                                color: successGreen,
+                              ),
+                              Column(
                                 crossAxisAlignment:
                                 CrossAxisAlignment
                                     .start,
                                 children: [
-                                  CheckboxListTile(
-                                    value:
-                                    _declaration,
-                                    activeColor:
-                                    iituRed,
-                                    contentPadding:
-                                    EdgeInsets
-                                        .zero,
-                                    controlAffinity:
-                                    ListTileControlAffinity
-                                        .leading,
-                                    title:
-                                    const Text(
-                                      'I confirm that the information above is correct.',
-                                      style:
-                                      TextStyle(
-                                        fontSize:
-                                        12,
-                                        fontWeight:
-                                        FontWeight
-                                            .w500,
-                                      ),
+                                  const Text(
+                                    'SERVER-CONFIRMED REQUEST',
+                                    style:
+                                    TextStyle(
+                                      color:
+                                      successGreen,
+                                      fontSize:
+                                      9.5,
+                                      fontWeight:
+                                      FontWeight
+                                          .w700,
+                                      letterSpacing:
+                                      0.7,
                                     ),
-                                    onChanged:
-                                        (value) {
-                                      final selected =
-                                          value ??
-                                              false;
-
-                                      setState(
-                                              () {
-                                            _declaration =
-                                                selected;
-                                          });
-
-                                      field
-                                          .didChange(
-                                        selected,
-                                      );
-                                    },
                                   ),
-
-                                  if (field
-                                      .hasError)
-                                    Text(
-                                      field
-                                          .errorText!,
-                                      style:
-                                      const TextStyle(
-                                        color:
-                                        iituRed,
-                                        fontSize:
-                                        10.5,
-                                      ),
+                                  const SizedBox(
+                                    height: 4,
+                                  ),
+                                  SelectableText(
+                                    _lastRequestId!,
+                                    style:
+                                    const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight:
+                                      FontWeight
+                                          .w600,
                                     ),
+                                  ),
                                 ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    Row(
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed:
-                          _submitForm,
-                          style:
-                          ElevatedButton
-                              .styleFrom(
-                            elevation: 0,
-                            backgroundColor:
-                            iituRed,
-                            foregroundColor:
-                            Colors.white,
-                            padding:
-                            const EdgeInsets
-                                .symmetric(
-                              horizontal: 22,
-                              vertical: 16,
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons.send_rounded,
-                            size: 17,
-                          ),
-                          label: const Text(
-                            'Submit Request',
-                          ),
-                        ),
-
-                        const SizedBox(
-                          width: 11,
-                        ),
-
-                        OutlinedButton.icon(
-                          onPressed:
-                          _resetForm,
-                          style:
-                          OutlinedButton
-                              .styleFrom(
-                            foregroundColor:
-                            darkText,
-                            padding:
-                            const EdgeInsets
-                                .symmetric(
-                              horizontal: 22,
-                              vertical: 16,
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons
-                                .refresh_rounded,
-                            size: 17,
-                          ),
-                          label: const Text(
-                            'Reset',
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  _loadAndShowRequest(
+                                    _lastRequestId!,
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons
+                                      .cloud_done_outlined,
+                                  size: 17,
+                                ),
+                                label: const Text(
+                                  'View Saved Request',
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -4251,12 +5011,21 @@ class _ServicesScreenState
                     Icons.person_outline,
                   ),
                 ),
+                onSaved: (value) {
+                  _studentName =
+                      value?.trim() ?? '';
+                },
                 validator: (value) {
                   final text =
                       value?.trim() ?? '';
 
                   if (text.isEmpty) {
                     return 'Please enter your full name.';
+                  }
+
+                  if (text.length < 3 ||
+                      text.length > 100) {
+                    return 'Name must be 3 to 100 characters.';
                   }
 
                   if (!text.contains(' ')) {
@@ -4281,11 +5050,20 @@ class _ServicesScreenState
                     Icons.badge_outlined,
                   ),
                 ),
+                onSaved: (value) {
+                  _studentId =
+                      value?.trim() ?? '';
+                },
                 validator: (value) {
-                  if ((value?.trim().length ??
-                      0) <
-                      5) {
+                  final id =
+                      value?.trim() ?? '';
+
+                  if (id.length < 5) {
                     return 'Student ID must have at least 5 characters.';
+                  }
+
+                  if (id.length > 30) {
+                    return 'Student ID must be at most 30 characters.';
                   }
 
                   return null;
@@ -4311,12 +5089,27 @@ class _ServicesScreenState
                     Icons.email_outlined,
                   ),
                 ),
+                onSaved: (value) {
+                  _email =
+                      value?.trim() ?? '';
+                },
                 validator: (value) {
                   final email =
                       value?.trim() ?? '';
 
-                  if (!email.contains('@') ||
-                      !email.contains('.')) {
+                  if (email.isEmpty) {
+                    return 'Please enter your campus email.';
+                  }
+
+                  if (email.length > 150) {
+                    return 'Email must be at most 150 characters.';
+                  }
+
+                  final emailPattern = RegExp(
+                    r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                  );
+
+                  if (!emailPattern.hasMatch(email)) {
                     return 'Enter a valid email address.';
                   }
 
@@ -4340,6 +5133,47 @@ class _ServicesScreenState
                     Icons.phone_outlined,
                   ),
                 ),
+                onSaved: (value) {
+                  _phone =
+                      value?.trim() ?? '';
+                },
+                validator: (value) {
+                  final phone =
+                      value?.trim() ?? '';
+
+                  if (phone.isEmpty) {
+                    if (_contactMethod ==
+                        'Phone') {
+                      return 'Phone number is required when Phone is selected.';
+                    }
+
+                    return null;
+                  }
+
+                  if (phone.length > 25) {
+                    return 'Phone number is too long.';
+                  }
+
+                  final allowed =
+                  RegExp(r'^\+?[0-9 ()-]+$');
+
+                  if (!allowed.hasMatch(phone)) {
+                    return 'Use digits and an optional leading + sign.';
+                  }
+
+                  final digits = phone
+                      .replaceAll(
+                    RegExp(r'\D'),
+                    '',
+                  );
+
+                  if (digits.length < 7 ||
+                      digits.length > 15) {
+                    return 'Enter 7 to 15 phone digits.';
+                  }
+
+                  return null;
+                },
               ),
             ),
           ],
@@ -4450,11 +5284,21 @@ class _ServicesScreenState
               Icons.short_text,
             ),
           ),
+          maxLength: 100,
+          onSaved: (value) {
+            _subject =
+                value?.trim() ?? '';
+          },
           validator: (value) {
-            if ((value?.trim().length ??
-                0) <
-                5) {
+            final subject =
+                value?.trim() ?? '';
+
+            if (subject.length < 5) {
               return 'Use at least 5 characters.';
+            }
+
+            if (subject.length > 100) {
+              return 'Subject must be at most 100 characters.';
             }
 
             return null;
@@ -4474,11 +5318,20 @@ class _ServicesScreenState
             'Request details',
             alignLabelWithHint: true,
           ),
+          onSaved: (value) {
+            _description =
+                value?.trim() ?? '';
+          },
           validator: (value) {
-            if ((value?.trim().length ??
-                0) <
-                20) {
+            final description =
+                value?.trim() ?? '';
+
+            if (description.length < 20) {
               return 'Please provide at least 20 characters.';
+            }
+
+            if (description.length > 500) {
+              return 'Request details must be at most 500 characters.';
             }
 
             return null;
@@ -4508,6 +5361,16 @@ class _ServicesScreenState
           runSpacing: 9,
           children: [
             ChoicePill(
+              label: 'Low',
+              selected:
+              _urgency == 'Low',
+              onTap: () {
+                setState(() {
+                  _urgency = 'Low';
+                });
+              },
+            ),
+            ChoicePill(
               label: 'Normal',
               selected:
               _urgency == 'Normal',
@@ -4518,22 +5381,12 @@ class _ServicesScreenState
               },
             ),
             ChoicePill(
-              label: 'Soon',
+              label: 'High',
               selected:
-              _urgency == 'Soon',
+              _urgency == 'High',
               onTap: () {
                 setState(() {
-                  _urgency = 'Soon';
-                });
-              },
-            ),
-            ChoicePill(
-              label: 'Urgent',
-              selected:
-              _urgency == 'Urgent',
-              onTap: () {
-                setState(() {
-                  _urgency = 'Urgent';
+                  _urgency = 'High';
                 });
               },
             ),
@@ -4577,19 +5430,6 @@ class _ServicesScreenState
                 setState(() {
                   _contactMethod =
                   'Phone';
-                });
-              },
-            ),
-            ChoicePill(
-              label:
-              'Campus meeting',
-              selected:
-              _contactMethod ==
-                  'Campus meeting',
-              onTap: () {
-                setState(() {
-                  _contactMethod =
-                  'Campus meeting';
                 });
               },
             ),
