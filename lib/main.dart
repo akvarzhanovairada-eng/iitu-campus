@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -13,20 +10,64 @@ void main() {
 // ============================================================
 
 const Color iituRed = Color(0xFFB71930);
-const Color iituDarkRed = Color(0xFF7D1020);
+const Color iituDarkRed = Color(0xFF851124);
 
-const Color darkText = Color(0xFF1B1C20);
-const Color greyText = Color(0xFF73767D);
+const Color darkText = Color(0xFF18191D);
+const Color greyText = Color(0xFF74777F);
 
-const Color pageBackground = Color(0xFFF8F8FA);
-const Color softGrey = Color(0xFFF2F2F5);
+const Color pageBackground = Color(0xFFF7F7F9);
+const Color softGrey = Color(0xFFF1F2F5);
 const Color softRed = Color(0xFFFCECEF);
-const Color borderColor = Color(0xFFE6E6EA);
+const Color borderColor = Color(0xFFE4E5EA);
 
 const Color navy = Color(0xFF071D2C);
-const Color navyLight = Color(0xFF123A52);
-
 const Color successGreen = Color(0xFF268A5B);
+
+// ============================================================
+// ROUTE NAMES
+// ============================================================
+
+// Requirement: route names are defined once and reused everywhere.
+class AppRoutes {
+  static const home = '/';
+  static const timetable = '/timetable';
+  static const services = '/services';
+  static const events = '/events';
+  static const campus = '/campus';
+  static const profile = '/profile';
+  static const serviceDetail = '/service-detail';
+}
+
+// Prevents accidental duplicate routes when a navigation control is tapped rapidly.
+DateTime? _lastNavigationAt;
+
+bool _navigationAllowed() {
+  final now = DateTime.now();
+  if (_lastNavigationAt != null &&
+      now.difference(_lastNavigationAt!) < const Duration(milliseconds: 450)) {
+    return false;
+  }
+  _lastNavigationAt = now;
+  return true;
+}
+
+Future<T?> safePushNamed<T>(
+    BuildContext context,
+    String route, {
+      Object? arguments,
+    }) {
+  if (!_navigationAllowed()) {
+    return Future<T?>.value(null);
+  }
+  return Navigator.pushNamed<T>(context, route, arguments: arguments);
+}
+
+Future<T?> safePush<T>(BuildContext context, Route<T> route) {
+  if (!_navigationAllowed()) {
+    return Future<T?>.value(null);
+  }
+  return Navigator.push<T>(context, route);
+}
 
 // ============================================================
 // APP
@@ -37,7 +78,7 @@ class IITUCampusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseTheme = ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
     );
@@ -45,31 +86,33 @@ class IITUCampusApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'IITU Campus',
-      theme: baseTheme.copyWith(
+      initialRoute: AppRoutes.home,
+
+      theme: base.copyWith(
         scaffoldBackgroundColor: pageBackground,
-        textTheme: GoogleFonts.plusJakartaSansTextTheme(
-          baseTheme.textTheme,
-        ).apply(
-          bodyColor: darkText,
-          displayColor: darkText,
-        ),
         colorScheme: ColorScheme.fromSeed(
           seedColor: iituRed,
           brightness: Brightness.light,
         ),
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          base.textTheme,
+        ).apply(
+          bodyColor: darkText,
+          displayColor: darkText,
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFF5F5F7),
+          fillColor: const Color(0xFFF7F7F9),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 17,
-          ),
-          hintStyle: const TextStyle(
-            color: Color(0xFF9A9CA3),
-            fontSize: 13,
+            horizontal: 17,
+            vertical: 16,
           ),
           labelStyle: const TextStyle(
             color: greyText,
+          ),
+          hintStyle: const TextStyle(
+            color: Color(0xFF9A9DA5),
+            fontSize: 12,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(17),
@@ -103,239 +146,348 @@ class IITUCampusApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const CampusPortal(),
-    );
-  }
-}
 
-// ============================================================
-// MAIN PORTAL
-// ============================================================
+      // Requirement: minimum four named routes.
+      routes: {
+        AppRoutes.home: (_) => const HomeScreen(),
+        AppRoutes.timetable: (_) => const TimetableScreen(),
+        AppRoutes.services: (_) => const ServicesScreen(),
+        AppRoutes.events: (_) => const EventsScreen(),
+        AppRoutes.campus: (_) => const CampusScreen(),
+        AppRoutes.profile: (_) => const ProfileScreen(),
+      },
 
-class CampusPortal extends StatefulWidget {
-  const CampusPortal({super.key});
+      // Requirement: pass an object to a details route.
+      onGenerateRoute: (settings) {
+        if (settings.name == AppRoutes.serviceDetail) {
+          final argument = settings.arguments;
 
-  @override
-  State<CampusPortal> createState() => _CampusPortalState();
-}
-
-class _CampusPortalState extends State<CampusPortal> {
-  int _pageIndex = 0;
-
-  int _floor = 1;
-  int _selectedPlace = 0;
-
-  int _eventIndex = 0;
-
-  Timer? _eventTimer;
-
-  ServiceRequestSummary? _lastServiceRequest;
-
-  final List<CampusEvent> events = const [
-    CampusEvent(
-      title: 'Almaty Student Hackathon',
-      category: 'Hackathon',
-      date: '12 OCT',
-      fullDate: '12 October 2026',
-      time: '10:00 AM – 6:00 PM',
-      location: 'Almaty',
-      description:
-      'Join students and young developers to build innovative digital solutions in teams.',
-      longDescription:
-      'The Almaty Student Hackathon brings together students from technology, design and business backgrounds. Participants work in teams, solve a real challenge, receive mentorship and present their final solution to a jury.',
-      image: 'assets/images/event_hackathon.jpg',
-      expectations: [
-        'Team-based innovation challenge',
-        'Mentoring from industry specialists',
-        'Networking with students and companies',
-        'Final project presentation',
-      ],
-    ),
-    CampusEvent(
-      title: 'Cybersecurity Workshop',
-      category: 'Workshop',
-      date: '18 OCT',
-      fullDate: '18 October 2026',
-      time: '2:00 PM – 5:00 PM',
-      location: 'IITU Campus',
-      description:
-      'A practical workshop focused on cybersecurity, networks and modern digital security tools.',
-      longDescription:
-      'This workshop introduces practical cybersecurity scenarios and tools. Students will work with network-security concepts, analyze common risks and discuss how modern systems can be protected.',
-      image: 'assets/images/event_cybersecurity.jpg',
-      expectations: [
-        'Practical cybersecurity exercises',
-        'Network-security demonstrations',
-        'Discussion of real security risks',
-        'Q&A with the workshop team',
-      ],
-    ),
-    CampusEvent(
-      title: 'Career & Internship Fair',
-      category: 'Career',
-      date: '24 OCT',
-      fullDate: '24 October 2026',
-      time: '11:00 AM – 4:00 PM',
-      location: 'IITU Main Hall',
-      description:
-      'Meet companies and explore internships, projects and future career opportunities.',
-      longDescription:
-      'The Career & Internship Fair connects IITU students with employers, internship programmes and graduate opportunities. Students can learn about companies, ask questions and build professional connections.',
-      image: 'assets/images/event_career.jpg',
-      expectations: [
-        'Meet recruiters and company representatives',
-        'Explore internships and graduate roles',
-        'Ask questions about career pathways',
-        'Build professional connections',
-      ],
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-
-    _eventTimer = Timer.periodic(
-      const Duration(seconds: 7),
-          (_) {
-        if (!mounted) return;
-
-        if (_pageIndex == 0) {
-          setState(() {
-            _eventIndex = (_eventIndex + 1) % events.length;
-          });
+          if (argument is CampusService) {
+            return MaterialPageRoute(
+              builder: (_) => ServiceDetailScreen(
+                service: argument,
+              ),
+              settings: settings,
+            );
+          }
         }
+
+        return null;
+      },
+
+      // Requirement: fallback for an unknown route.
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (_) => UnknownRouteScreen(
+            routeName: settings.name ?? 'Unknown route',
+          ),
+        );
       },
     );
   }
+}
 
-  @override
-  void dispose() {
-    _eventTimer?.cancel();
-    super.dispose();
-  }
+// ============================================================
+// MODELS
+// ============================================================
 
-  // ============================================================
-  // BASIC ACTIONS
-  // ============================================================
+class CampusService {
+  final String name;
+  final String description;
+  final String location;
+  final String openingHours;
+  final String contact;
+  final String status;
+  final IconData icon;
+  final Color color;
 
-  void _changePage(int index) {
-    setState(() {
-      _pageIndex = index;
-    });
-  }
+  const CampusService({
+    required this.name,
+    required this.description,
+    required this.location,
+    required this.openingHours,
+    required this.contact,
+    required this.status,
+    required this.icon,
+    this.color = iituRed,
+  });
+}
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+class CampusEvent {
+  final String title;
+  final String category;
+  final String date;
+  final String time;
+  final String venue;
+  final String image;
+  final String description;
+  final List<String> expectations;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: darkText,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    );
-  }
+  const CampusEvent({
+    required this.title,
+    required this.category,
+    required this.date,
+    required this.time,
+    required this.venue,
+    required this.image,
+    required this.description,
+    required this.expectations,
+  });
+}
 
-  void _openEvent(CampusEvent event) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => EventDetailsPage(
-          event: event,
-        ),
-      ),
-    );
-  }
+class ClassItem {
+  final int day;
+  final int timeSlot;
+  final String module;
+  final String room;
+  final String time;
+  final bool nextClass;
 
-  void _showLastRequest() {
-    final request = _lastServiceRequest;
+  const ClassItem({
+    required this.day,
+    required this.timeSlot,
+    required this.module,
+    required this.room,
+    required this.time,
+    this.nextClass = false,
+  });
+}
 
-    if (request == null) {
-      _showMessage(
-        'You do not have a submitted service request yet.',
+class PlannerItem {
+  final String title;
+  final DateTime date;
+  final TimeOfDay time;
+  bool completed;
+
+  PlannerItem({
+    required this.title,
+    required this.date,
+    required this.time,
+    this.completed = false,
+  });
+}
+
+// ============================================================
+// SAMPLE DATA
+// ============================================================
+
+const campusServices = [
+  CampusService(
+    name: 'IT Helpdesk',
+    description:
+    'Technical support for university accounts, Wi-Fi, devices and digital services.',
+    location: 'Room 205',
+    openingHours: '09:00 – 18:00',
+    contact: 'helpdesk@iitu.edu.kz',
+    status: 'Open',
+    icon: Icons.support_agent_outlined,
+    color: Color(0xFF3B82F6),
+  ),
+  CampusService(
+    name: 'Student Affairs',
+    description:
+    'Support with student documents, campus life and general university questions.',
+    location: 'Student Centre',
+    openingHours: '09:00 – 17:30',
+    contact: 'student.affairs@iitu.edu.kz',
+    status: 'Open',
+    icon: Icons.groups_outlined,
+    color: Color(0xFFF59E0B),
+  ),
+  CampusService(
+    name: 'Library Services',
+    description:
+    'Library access, borrowing support, study rooms and academic resources.',
+    location: 'Level 3',
+    openingHours: '08:30 – 20:00',
+    contact: 'library@iitu.edu.kz',
+    status: 'Open',
+    icon: Icons.local_library_outlined,
+    color: Color(0xFF7C3AED),
+  ),
+  CampusService(
+    name: 'Academic Office',
+    description:
+    'Academic documents, course information and administrative support.',
+    location: 'Room 312',
+    openingHours: '09:00 – 17:00',
+    contact: 'academic@iitu.edu.kz',
+    status: 'Open',
+    icon: Icons.school_outlined,
+    color: Color(0xFF0F9D8A),
+  ),
+  CampusService(
+    name: 'Finance Office',
+    description:
+    'Questions about tuition payments, invoices and student financial records.',
+    location: 'Room 118',
+    openingHours: '09:00 – 17:00',
+    contact: 'finance@iitu.edu.kz',
+    status: 'Open',
+    icon: Icons.account_balance_wallet_outlined,
+    color: Color(0xFF2E8B57),
+  ),
+  CampusService(
+    name: 'Career Center',
+    description:
+    'Internships, CV support, career events and employment opportunities.',
+    location: 'Room 405',
+    openingHours: '10:00 – 18:00',
+    contact: 'career@iitu.edu.kz',
+    status: 'Open',
+    icon: Icons.work_outline_rounded,
+    color: Color(0xFF4F46E5),
+  ),
+];
+
+const campusEvents = [
+  CampusEvent(
+    title: 'Almaty Student Hackathon',
+    category: 'Hackathon',
+    date: '12 October 2026',
+    time: '10:00 – 18:00',
+    venue: 'Almaty',
+    image: 'assets/images/event_hackathon.jpg',
+    description:
+    'A full-day student hackathon focused on technology, teamwork and innovative digital solutions.',
+    expectations: [
+      'Team-based innovation challenge',
+      'Mentorship from industry specialists',
+      'Networking opportunities',
+      'Final project presentations',
+    ],
+  ),
+  CampusEvent(
+    title: 'Cybersecurity Workshop',
+    category: 'Workshop',
+    date: '18 October 2026',
+    time: '14:00 – 17:00',
+    venue: 'IITU Campus',
+    image: 'assets/images/event_cybersecurity.jpg',
+    description:
+    'A practical session on cybersecurity, networks and modern digital security tools.',
+    expectations: [
+      'Practical security exercises',
+      'Network-security demonstrations',
+      'Discussion of real security risks',
+      'Q&A session',
+    ],
+  ),
+  CampusEvent(
+    title: 'Career & Internship Fair',
+    category: 'Career',
+    date: '24 October 2026',
+    time: '11:00 – 16:00',
+    venue: 'IITU Main Hall',
+    image: 'assets/images/event_career.jpg',
+    description:
+    'Meet employers and explore internships, graduate opportunities and career pathways.',
+    expectations: [
+      'Meet recruiters',
+      'Explore internship programmes',
+      'Ask employers questions',
+      'Build professional connections',
+    ],
+  ),
+];
+
+const classItems = [
+  ClassItem(
+    day: 1,
+    timeSlot: 0,
+    module: 'Network Security',
+    room: 'Room 304',
+    time: '09:00',
+    nextClass: true,
+  ),
+  ClassItem(
+    day: 2,
+    timeSlot: 1,
+    module: 'Cloud Computing',
+    room: 'Lab 212',
+    time: '11:00',
+  ),
+  ClassItem(
+    day: 0,
+    timeSlot: 2,
+    module: 'Machine Learning',
+    room: 'Room 406',
+    time: '14:00',
+  ),
+  ClassItem(
+    day: 3,
+    timeSlot: 3,
+    module: 'ERP Programming',
+    room: 'Room 302',
+    time: '16:00',
+  ),
+  ClassItem(
+    day: 4,
+    timeSlot: 1,
+    module: 'Data Science',
+    room: 'Room 218',
+    time: '11:00',
+  ),
+];
+
+// ============================================================
+// COMMON APP SHELL
+// ============================================================
+
+class CampusScaffold extends StatelessWidget {
+  final String currentRoute;
+  final Widget child;
+  final String? title;
+
+  const CampusScaffold({
+    super.key,
+    required this.currentRoute,
+    required this.child,
+    this.title,
+  });
+
+  void _navigate(
+      BuildContext context,
+      String route,
+      ) {
+    if (route == currentRoute) {
+      return;
+    }
+
+    if (route == AppRoutes.home) {
+      Navigator.popUntil(
+        context,
+        ModalRoute.withName(AppRoutes.home),
       );
       return;
     }
 
-    showDialog(
+    // Requirement: navigation between registered routes
+    // uses Navigator.pushNamed().
+    safePushNamed(
+      context,
+      route,
+    );
+  }
+
+  void _showSearchDialog(BuildContext context) {
+    showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(26),
-          ),
-          title: const Text(
-            'Latest Request',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
-          ),
-          content: SizedBox(
-            width: 430,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _summaryRow(
-                  'Reference',
-                  request.reference,
-                ),
-                _summaryRow(
-                  'Issue',
-                  request.category,
-                ),
-                _summaryRow(
-                  'Urgency',
-                  request.urgency,
-                ),
-                _summaryRow(
-                  'Contact',
-                  request.contactMethod,
-                ),
-                _summaryRow(
-                  'Preferred date',
-                  request.preferredDate,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF7F0),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        color: successGreen,
-                        size: 19,
-                      ),
-                      SizedBox(width: 9),
-                      Text(
-                        'Status: Submitted',
-                        style: TextStyle(
-                          color: successGreen,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          title: const Text('Campus search'),
+          content: const TextField(
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Search IITU Campus',
+              hintText: 'Try: Library, Events, IT Helpdesk',
+              prefixIcon: Icon(Icons.search_rounded),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Close'),
             ),
           ],
@@ -344,108 +496,351 @@ class _CampusPortalState extends State<CampusPortal> {
     );
   }
 
-  Widget _summaryRow(
-      String label,
-      String value,
-      ) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 13,
+  void _showNotifications(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No new notifications right now.'),
+        behavior: SnackBarBehavior.floating,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: greyText,
-                fontSize: 11.5,
+    );
+  }
+
+  int _mobileIndex() {
+    switch (currentRoute) {
+      case AppRoutes.events:
+        return 1;
+      case AppRoutes.campus:
+        return 2;
+      case AppRoutes.services:
+        return 3;
+      case AppRoutes.profile:
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final desktop =
+        MediaQuery.of(context).size.width >= 900;
+
+    return Scaffold(
+      backgroundColor: pageBackground,
+
+      appBar: AppBar(
+        automaticallyImplyLeading: !desktop,
+        leading: desktop &&
+            currentRoute != AppRoutes.home &&
+            Navigator.canPop(context)
+            ? IconButton(
+          tooltip: 'Back',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
+        )
+            : null,
+        toolbarHeight: desktop ? 78 : 68,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+
+        title: Row(
+          children: [
+            SizedBox(
+              width: desktop ? 145 : 110,
+              height: 42,
+              child: AppAssetImage(
+                path: 'assets/images/iitu_logo.png',
+                fit: BoxFit.contain,
+                alignment: Alignment.centerLeft,
               ),
             ),
+
+            if (desktop) ...[
+              const SizedBox(width: 35),
+
+              NavButton(
+                label: 'Home',
+                active: currentRoute == AppRoutes.home,
+                onTap: () => _navigate(
+                  context,
+                  AppRoutes.home,
+                ),
+              ),
+
+              NavButton(
+                label: 'Schedule',
+                active:
+                currentRoute == AppRoutes.timetable,
+                onTap: () => _navigate(
+                  context,
+                  AppRoutes.timetable,
+                ),
+              ),
+
+              NavButton(
+                label: 'Events',
+                active:
+                currentRoute == AppRoutes.events,
+                onTap: () => _navigate(
+                  context,
+                  AppRoutes.events,
+                ),
+              ),
+
+              NavButton(
+                label: 'Campus',
+                active:
+                currentRoute == AppRoutes.campus,
+                onTap: () => _navigate(
+                  context,
+                  AppRoutes.campus,
+                ),
+              ),
+
+              NavButton(
+                label: 'Services',
+                active:
+                currentRoute == AppRoutes.services,
+                onTap: () => _navigate(
+                  context,
+                  AppRoutes.services,
+                ),
+              ),
+
+              NavButton(
+                label: 'Profile',
+                active:
+                currentRoute == AppRoutes.profile,
+                onTap: () => _navigate(
+                  context,
+                  AppRoutes.profile,
+                ),
+              ),
+            ],
+          ],
+        ),
+
+        actions: [
+          IconButton(
+            tooltip: 'Search',
+            onPressed: () => _showSearchDialog(context),
+            icon: const Icon(
+              Icons.search_rounded,
+            ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => _showNotifications(context),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+            ),
+          ),
+          const SizedBox(width: 5),
+          GestureDetector(
+            onTap: () => _navigate(
+              context,
+              AppRoutes.profile,
+            ),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 18),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: softRed,
+                backgroundImage: AssetImage(
+                  'assets/images/profile_irada.png',
+                ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
 
-  // ============================================================
-  // MAIN BUILD
-  // ============================================================
+      drawer: desktop
+          ? null
+          : Drawer(
+        backgroundColor: Colors.white,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    iituDarkRed,
+                    iituRed,
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundImage: AssetImage(
+                      'assets/images/profile_irada.png',
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Akvarzhanova Irada',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Network Security · 3rd Year',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+            DrawerNavTile(
+              icon: Icons.home_outlined,
+              title: 'Home',
+              onTap: () {
+                Navigator.pop(context);
+                _navigate(
+                  context,
+                  AppRoutes.home,
+                );
+              },
+            ),
 
-    final desktop = width >= 920;
+            DrawerNavTile(
+              icon: Icons.calendar_month_outlined,
+              title: 'Schedule & Planner',
+              onTap: () {
+                Navigator.pop(context);
+                _navigate(
+                  context,
+                  AppRoutes.timetable,
+                );
+              },
+            ),
 
-    return Scaffold(
-      appBar: _buildAppBar(desktop),
+            DrawerNavTile(
+              icon: Icons.event_outlined,
+              title: 'Events',
+              onTap: () {
+                Navigator.pop(context);
+                _navigate(
+                  context,
+                  AppRoutes.events,
+                );
+              },
+            ),
 
-      drawer: desktop ? null : _buildDrawer(),
+            DrawerNavTile(
+              icon: Icons.map_outlined,
+              title: 'Campus',
+              onTap: () {
+                Navigator.pop(context);
+                _navigate(
+                  context,
+                  AppRoutes.campus,
+                );
+              },
+            ),
+
+            DrawerNavTile(
+              icon: Icons.support_agent_outlined,
+              title: 'Services',
+              onTap: () {
+                Navigator.pop(context);
+                _navigate(
+                  context,
+                  AppRoutes.services,
+                );
+              },
+            ),
+
+            DrawerNavTile(
+              icon: Icons.person_outline,
+              title: 'Profile',
+              onTap: () {
+                Navigator.pop(context);
+                _navigate(
+                  context,
+                  AppRoutes.profile,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
 
       body: SafeArea(
         top: false,
-        child: AnimatedSwitcher(
-          duration: const Duration(
-            milliseconds: 350,
-          ),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          child: KeyedSubtree(
-            key: ValueKey(_pageIndex),
-            child: _currentPage(),
-          ),
-        ),
+        child: child,
       ),
 
       bottomNavigationBar: desktop
           ? null
           : BottomNavigationBar(
-        currentIndex: _pageIndex,
+        currentIndex: _mobileIndex(),
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         selectedItemColor: iituRed,
         unselectedItemColor: Colors.grey,
         selectedFontSize: 10,
         unselectedFontSize: 10,
-        onTap: _changePage,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              _navigate(
+                context,
+                AppRoutes.home,
+              );
+              break;
+            case 1:
+              _navigate(
+                context,
+                AppRoutes.events,
+              );
+              break;
+            case 2:
+              _navigate(
+                context,
+                AppRoutes.campus,
+              );
+              break;
+            case 3:
+              _navigate(
+                context,
+                AppRoutes.services,
+              );
+              break;
+            case 4:
+              _navigate(
+                context,
+                AppRoutes.profile,
+              );
+              break;
+          }
+        },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.home_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.home_rounded,
-            ),
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.event_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.event_rounded,
-            ),
+            icon: Icon(Icons.event_outlined),
+            activeIcon: Icon(Icons.event),
             label: 'Events',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.map_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.map_rounded,
-            ),
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
             label: 'Campus',
           ),
           BottomNavigationBarItem(
@@ -453,347 +848,139 @@ class _CampusPortalState extends State<CampusPortal> {
               Icons.support_agent_outlined,
             ),
             activeIcon: Icon(
-              Icons.support_agent_rounded,
+              Icons.support_agent,
             ),
             label: 'Services',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.person_outline,
-            ),
-            activeIcon: Icon(
-              Icons.person,
-            ),
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _currentPage() {
-    switch (_pageIndex) {
-      case 1:
-        return _eventsPage();
+// ============================================================
+// HOME SCREEN
+// ============================================================
 
-      case 2:
-        return _campusPage();
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
-      case 3:
-        return StudentServicesPage(
-          lastRequest: _lastServiceRequest,
-          onSubmitted: (request) {
-            setState(() {
-              _lastServiceRequest = request;
-            });
-          },
-        );
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.home,
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            const HeroHomeSection(),
 
-      case 4:
-        return _profilePage();
+            MaxWidth(
+              child: Column(
+                children: [
+                  const SizedBox(height: 55),
 
-      default:
-        return _homePage();
-    }
-  }
+                  const AcademicStrip(),
 
-  // ============================================================
-  // APP BAR
-  // ============================================================
+                  const SizedBox(height: 18),
 
-  PreferredSizeWidget _buildAppBar(
-      bool desktop,
-      ) {
-    return AppBar(
-      automaticallyImplyLeading: !desktop,
-      toolbarHeight: desktop ? 78 : 68,
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.white,
-      foregroundColor: darkText,
-      elevation: 0,
+                  HomeReminderCard(
+                    onTap: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.timetable,
+                      );
+                    },
+                  ),
 
-      title: Row(
-        children: [
-          SizedBox(
-            width: desktop ? 145 : 112,
-            height: 43,
-            child: AppImage(
-              path: 'assets/images/iitu_logo.png',
-              fit: BoxFit.contain,
-              alignment: Alignment.centerLeft,
-            ),
-          ),
+                  const SizedBox(height: 95),
 
-          if (desktop) ...[
-            const SizedBox(width: 42),
+                  SectionHeading(
+                    eyebrow: 'STUDENT SPACE',
+                    title: 'Everything you need, around you.',
+                    subtitle:
+                    'Open your schedule, events, campus services and student tools from one dashboard.',
+                  ),
 
-            HeaderNavButton(
-              label: 'Home',
-              active: _pageIndex == 0,
-              onTap: () => _changePage(0),
-            ),
+                  const SizedBox(height: 32),
 
-            HeaderNavButton(
-              label: 'Events',
-              active: _pageIndex == 1,
-              onTap: () => _changePage(1),
-            ),
+                  DashboardGrid(
+                    onSchedule: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.timetable,
+                      );
+                    },
+                    onServices: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.services,
+                      );
+                    },
+                    onEvents: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.events,
+                      );
+                    },
+                    onCampus: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.campus,
+                      );
+                    },
+                  ),
 
-            HeaderNavButton(
-              label: 'Campus',
-              active: _pageIndex == 2,
-              onTap: () => _changePage(2),
-            ),
+                  const SizedBox(height: 105),
 
-            HeaderNavButton(
-              label: 'Services',
-              active: _pageIndex == 3,
-              onTap: () => _changePage(3),
-            ),
+                  StudentSupportPromo(
+                    onTap: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.services,
+                      );
+                    },
+                  ),
 
-            HeaderNavButton(
-              label: 'Profile',
-              active: _pageIndex == 4,
-              onTap: () => _changePage(4),
-            ),
-          ],
-        ],
-      ),
+                  const SizedBox(height: 105),
 
-      actions: [
-        HeaderIconButton(
-          icon: Icons.search_rounded,
-          onTap: () {
-            _showMessage(
-              'Search selected.',
-            );
-          },
-        ),
+                  HomeEventsPreview(
+                    onViewAll: () {
+                      safePushNamed(
+                        context,
+                        AppRoutes.events,
+                      );
+                    },
+                  ),
 
-        HeaderIconButton(
-          icon: Icons.notifications_none_rounded,
-          onTap: () {
-            _showMessage(
-              'You have 2 new university updates.',
-            );
-          },
-        ),
+                  const SizedBox(height: 100),
 
-        const SizedBox(width: 8),
+                  const CampusLifeSection(),
 
-        GestureDetector(
-          onTap: () => _changePage(4),
-          child: const Padding(
-            padding: EdgeInsets.only(
-              right: 18,
-            ),
-            child: CircleAvatar(
-              radius: 21,
-              backgroundColor: softRed,
-              backgroundImage: AssetImage(
-                'assets/images/profile_irada.png',
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // DRAWER
-  // ============================================================
-
-  Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: Colors.white,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  iituDarkRed,
-                  iituRed,
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundImage: AssetImage(
-                    'assets/images/profile_irada.png',
-                  ),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'Akvarzhanova Irada',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Network Security • 3rd Year',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          _drawerItem(
-            Icons.home_outlined,
-            'Home',
-            0,
-          ),
-
-          _drawerItem(
-            Icons.event_outlined,
-            'Events',
-            1,
-          ),
-
-          _drawerItem(
-            Icons.map_outlined,
-            'Campus Map',
-            2,
-          ),
-
-          _drawerItem(
-            Icons.support_agent_outlined,
-            'Student Services',
-            3,
-          ),
-
-          _drawerItem(
-            Icons.person_outline,
-            'My Profile',
-            4,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _drawerItem(
-      IconData icon,
-      String title,
-      int page,
-      ) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: iituRed,
-      ),
-      title: Text(title),
-      onTap: () {
-        Navigator.pop(context);
-        _changePage(page);
-      },
-    );
-  }
+// ============================================================
+// HERO
+// ============================================================
 
-  // ============================================================
-  // HOME PAGE
-  // ============================================================
+class HeroHomeSection extends StatelessWidget {
+  const HeroHomeSection({super.key});
 
-  Widget _homePage() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _heroSection(),
-
-          _maxWidth(
-            child: Column(
-              children: [
-                const SizedBox(height: 58),
-
-                SimpleReveal(
-                  delay: 60,
-                  child: _homeAcademicStrip(),
-                ),
-
-                const SizedBox(height: 105),
-
-                SimpleReveal(
-                  delay: 120,
-                  child: _studentHubSection(),
-                ),
-
-                const SizedBox(height: 115),
-
-                SimpleReveal(
-                  delay: 180,
-                  child: StudentSupportPromo(
-                    hasRequest:
-                    _lastServiceRequest != null,
-                    onOpenServices: () {
-                      _changePage(3);
-                    },
-                    onOpenStatus: _showLastRequest,
-                  ),
-                ),
-
-                const SizedBox(height: 115),
-
-                SimpleReveal(
-                  delay: 240,
-                  child: _announcementSection(),
-                ),
-
-                const SizedBox(height: 115),
-
-                SimpleReveal(
-                  delay: 300,
-                  child: _eventsShowcase(),
-                ),
-
-                const SizedBox(height: 115),
-
-                SimpleReveal(
-                  delay: 360,
-                  child: _campusLifeSection(),
-                ),
-
-                const SizedBox(height: 115),
-
-                SimpleReveal(
-                  delay: 420,
-                  child: _globalFooter(),
-                ),
-
-                const SizedBox(height: 30),
-
-                const Text(
-                  'IITU Campus • Student Portal Concept • 2026',
-                  style: TextStyle(
-                    color: greyText,
-                    fontSize: 10.5,
-                  ),
-                ),
-
-                const SizedBox(height: 42),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // HERO
-  // ============================================================
-
-  Widget _heroSection() {
+  @override
+  Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (
           context,
@@ -807,14 +994,21 @@ class _CampusPortalState extends State<CampusPortal> {
             color: Colors.white,
             child: Column(
               children: [
-                _heroText(
-                  mobile: true,
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    50,
+                    24,
+                    45,
+                  ),
+                  child: HeroCopy(
+                    mobile: true,
+                  ),
                 ),
                 SizedBox(
                   height: 330,
-                  width: double.infinity,
-                  child: AnimatedHeroImage(
-                    image:
+                  child: AppAssetImage(
+                    path:
                     'assets/images/hero_campus.png',
                   ),
                 ),
@@ -824,14 +1018,32 @@ class _CampusPortalState extends State<CampusPortal> {
         }
 
         return SizedBox(
-          height: 625,
-          width: double.infinity,
+          height: 620,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              AnimatedHeroImage(
-                image:
-                'assets/images/hero_campus.png',
+              TweenAnimationBuilder<double>(
+                duration: const Duration(
+                  seconds: 4,
+                ),
+                tween: Tween(
+                  begin: 1.05,
+                  end: 1,
+                ),
+                builder: (
+                    context,
+                    scale,
+                    child,
+                    ) {
+                  return Transform.scale(
+                    scale: scale,
+                    child: child,
+                  );
+                },
+                child: AppAssetImage(
+                  path:
+                  'assets/images/hero_campus.png',
+                ),
               ),
 
               Container(
@@ -841,25 +1053,30 @@ class _CampusPortalState extends State<CampusPortal> {
                     end: Alignment.centerRight,
                     colors: [
                       Colors.white,
-                      Colors.white.withOpacity(0.99),
-                      Colors.white.withOpacity(0.82),
-                      Colors.white.withOpacity(0.15),
+                      Colors.white.withOpacity(0.98),
+                      Colors.white.withOpacity(0.75),
+                      Colors.white.withOpacity(0.10),
                     ],
                     stops: const [
                       0,
-                      0.30,
-                      0.59,
+                      0.32,
+                      0.61,
                       1,
                     ],
                   ),
                 ),
               ),
 
-              Align(
+              const Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: 700,
-                  child: _heroText(),
+                  width: 690,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 52,
+                    ),
+                    child: HeroCopy(),
+                  ),
                 ),
               ),
             ],
@@ -868,150 +1085,137 @@ class _CampusPortalState extends State<CampusPortal> {
       },
     );
   }
+}
 
-  Widget _heroText({
-    bool mobile = false,
-  }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: mobile ? 25 : 52,
-        vertical: mobile ? 48 : 55,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          RevealAfterDelay(
-            delay: 60,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: softRed,
-                borderRadius: BorderRadius.circular(
-                  30,
+class HeroCopy extends StatelessWidget {
+  final bool mobile;
+
+  const HeroCopy({
+    super.key,
+    this.mobile = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        RevealWidget(
+          delay: 80,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: softRed,
+              borderRadius:
+              BorderRadius.circular(30),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.school_outlined,
+                  color: iituRed,
+                  size: 15,
                 ),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.school_outlined,
-                    size: 15,
+                SizedBox(width: 7),
+                Text(
+                  'INTERNATIONAL INFORMATION TECHNOLOGY UNIVERSITY',
+                  style: TextStyle(
                     color: iituRed,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.7,
                   ),
-                  SizedBox(width: 7),
-                  Flexible(
-                    child: Text(
-                      'INTERNATIONAL INFORMATION TECHNOLOGY UNIVERSITY',
-                      style: TextStyle(
-                        color: iituRed,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
+        ),
 
-          const SizedBox(height: 29),
+        const SizedBox(height: 27),
 
-          RevealAfterDelay(
-            delay: 160,
+        RevealWidget(
+          delay: 170,
+          child: Text(
+            'Your Campus.\nYour Future.\nYour IITU.',
+            style: TextStyle(
+              fontSize: mobile ? 44 : 60,
+              height: 1.02,
+              letterSpacing:
+              mobile ? -1.7 : -2.8,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 21),
+
+        RevealWidget(
+          delay: 260,
+          child: SizedBox(
+            width: 520,
             child: Text(
-              'Your Campus.\nYour Future.\nYour IITU.',
+              'A smarter way to explore academic life, student services, events and opportunities at IITU.',
               style: TextStyle(
-                color: darkText,
-                fontSize: mobile ? 43 : 59,
-                height: 1.03,
-                letterSpacing: mobile ? -1.8 : -2.8,
-                fontWeight: FontWeight.w600,
+                color: greyText,
+                fontSize: mobile ? 14 : 16,
+                height: 1.65,
               ),
             ),
           ),
+        ),
 
-          const SizedBox(height: 23),
+        const SizedBox(height: 30),
 
-          RevealAfterDelay(
-            delay: 260,
-            child: SizedBox(
-              width: 520,
-              child: Text(
-                'A smarter way to explore academic life, student services, events and opportunities at IITU.',
-                style: TextStyle(
-                  color: const Color(
-                    0xFF60636A,
-                  ),
-                  fontSize: mobile ? 14 : 16.5,
-                  height: 1.65,
-                  fontWeight: FontWeight.w400,
-                ),
+        RevealWidget(
+          delay: 350,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                AppRoutes.campus,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: iituRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
               ),
             ),
-          ),
-
-          const SizedBox(height: 31),
-
-          RevealAfterDelay(
-            delay: 360,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                _changePage(2);
-              },
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: iituRed,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 25,
-                  vertical: 17,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    30,
-                  ),
-                ),
-              ),
-              icon: const Icon(
-                Icons.arrow_forward_rounded,
-                size: 17,
-              ),
-              label: const Text(
-                'Explore Campus',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              size: 17,
+            ),
+            label: const Text(
+              'Explore Campus',
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
 
-  // ============================================================
-  // ACADEMIC STRIP
-  // ============================================================
+// ============================================================
+// HOME ACADEMIC STRIP
+// ============================================================
 
-  Widget _homeAcademicStrip() {
+class AcademicStrip extends StatelessWidget {
+  const AcademicStrip({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(
-        vertical: 4,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 29,
-        vertical: 25,
-      ),
-
-      // Explicit Container alignment for the Container assignment.
-      alignment: Alignment.centerLeft,
-
+      padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(27),
@@ -1020,8 +1224,8 @@ class _CampusPortalState extends State<CampusPortal> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.024),
-            blurRadius: 25,
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
@@ -1032,10 +1236,11 @@ class _CampusPortalState extends State<CampusPortal> {
             constraints,
             ) {
           final desktop =
-              constraints.maxWidth >= 820;
+              constraints.maxWidth >= 760;
 
-          final greeting = const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const greeting = Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
               Text(
                 'Good morning, Irada.',
@@ -1045,34 +1250,34 @@ class _CampusPortalState extends State<CampusPortal> {
                   letterSpacing: -0.7,
                 ),
               ),
-              SizedBox(height: 6),
+              SizedBox(height: 5),
               Text(
                 'Here’s your academic overview for today.',
                 style: TextStyle(
                   color: greyText,
-                  fontSize: 12.5,
+                  fontSize: 12,
                 ),
               ),
             ],
           );
 
-          const indicators = Wrap(
-            spacing: 24,
-            runSpacing: 16,
+          const values = Wrap(
+            spacing: 26,
+            runSpacing: 18,
             children: [
-              CompactAcademicValue(
+              AcademicMiniValue(
                 label: 'SEMESTER',
                 value: '5',
               ),
-              CompactAcademicValue(
+              AcademicMiniValue(
                 label: 'GPA',
                 value: '3.5',
               ),
-              CompactAcademicValue(
+              AcademicMiniValue(
                 label: 'CREDITS',
                 value: '90',
               ),
-              CompactAcademicValue(
+              AcademicMiniValue(
                 label: 'ATTENDANCE',
                 value: '92%',
               ),
@@ -1080,527 +1285,301 @@ class _CampusPortalState extends State<CampusPortal> {
           );
 
           if (!desktop) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            return const Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
               children: [
                 greeting,
-                const SizedBox(height: 25),
-                indicators,
+                SizedBox(height: 24),
+                values,
               ],
             );
           }
 
-          return Row(
+          return const Row(
             children: [
               Expanded(
                 child: greeting,
               ),
-              const SizedBox(width: 30),
-              indicators,
+              values,
             ],
           );
         },
       ),
     );
   }
+}
 
-  // ============================================================
-  // STUDENT HUB
-  // ============================================================
+class HomeReminderCard extends StatelessWidget {
+  final VoidCallback onTap;
 
-  Widget _studentHubSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PremiumHeading(
-          eyebrow: 'STUDENT SPACE',
-          title: 'Everything you need, around you.',
-          subtitle:
-          'Access university tools and manage your day without leaving the portal.',
+  const HomeReminderCard({
+    super.key,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: softRed,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: iituRed.withOpacity(0.18)),
         ),
-
-        const SizedBox(height: 42),
-
-        LayoutBuilder(
-          builder: (
-              context,
-              constraints,
-              ) {
-            final desktop =
-                constraints.maxWidth >= 900;
-
-            final hub = OrbitHub(
-              onSelect: (
-                  value,
-                  ) {
-                if (value == 'Campus') {
-                  _changePage(2);
-                } else if (value == 'Events') {
-                  _changePage(1);
-                } else if (value == 'Services') {
-                  _changePage(3);
-                } else if (value == 'Calendar') {
-                  _showMessage(
-                    'Calendar selected.',
-                  );
-                } else {
-                  _showMessage(
-                    '$value selected.',
-                  );
-                }
-              },
-            );
-
-            final today = _todayPanel();
-
-            if (!desktop) {
-              return Column(
-                children: [
-                  hub,
-                  const SizedBox(height: 40),
-                  today,
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(
-                  child: hub,
-                ),
-                const SizedBox(width: 62),
-                SizedBox(
-                  width: 390,
-                  child: today,
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _todayPanel() {
-    return Container(
-      padding: const EdgeInsets.all(29),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: borderColor,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Icon(
+                Icons.schedule_rounded,
+                color: iituRed,
+              ),
+            ),
+            const SizedBox(width: 15),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'TODAY',
+                    'NEXT CLASS REMINDER',
                     style: TextStyle(
                       color: iituRed,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.4,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
                     ),
                   ),
                   SizedBox(height: 5),
                   Text(
-                    'Tuesday',
+                    'Network Security · Tuesday 09:00 · Room 304',
                     style: TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.7,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-              Icon(
-                Icons.wb_sunny_outlined,
-                color: iituRed,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 25),
-
-          _todayClass(
-            '09:00',
-            'Network Security',
-            'Room 304',
-            true,
-          ),
-
-          _todayClass(
-            '11:00',
-            'Cloud Computing',
-            'Lab 212',
-            false,
-          ),
-
-          _todayClass(
-            '14:00',
-            'Machine Learning',
-            'Room 406',
-            false,
-          ),
-
-          const SizedBox(height: 6),
-
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                _changePage(3);
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: iituRed,
-                side: const BorderSide(
-                  color: Color(0xFFEAC1C8),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                ),
-              ),
-              icon: const Icon(
-                Icons.support_agent_outlined,
-                size: 17,
-              ),
-              label: const Text(
-                'Need help?',
-              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _todayClass(
-      String time,
-      String subject,
-      String room,
-      bool current,
-      ) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 18,
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 52,
-            child: Text(
-              time,
-              style: TextStyle(
-                color:
-                current ? iituRed : darkText,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-
-          Container(
-            width: 3,
-            height: 38,
-            margin: const EdgeInsets.symmetric(
-              horizontal: 12,
-            ),
-            decoration: BoxDecoration(
-              color:
-              current ? iituRed : borderColor,
-              borderRadius: BorderRadius.circular(5),
-            ),
-          ),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  subject,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  room,
-                  style: const TextStyle(
-                    color: greyText,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // ANNOUNCEMENTS
-  // ============================================================
-
-  Widget _announcementSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PremiumHeading(
-          eyebrow: 'LATEST FROM IITU',
-          title: 'Stay connected with university life.',
-          subtitle:
-          'Academic opportunities, events and important campus updates.',
-        ),
-
-        const SizedBox(height: 38),
-
-        LayoutBuilder(
-          builder: (
-              context,
-              constraints,
-              ) {
-            double cardWidth;
-
-            if (constraints.maxWidth >= 960) {
-              cardWidth =
-                  (constraints.maxWidth - 36) / 3;
-            } else if (constraints.maxWidth >=
-                620) {
-              cardWidth =
-                  (constraints.maxWidth - 18) / 2;
-            } else {
-              cardWidth =
-                  constraints.maxWidth;
-            }
-
-            return Wrap(
-              spacing: 18,
-              runSpacing: 18,
-              children: [
-                SizedBox(
-                  width: cardWidth,
-                  child:
-                  _doubleDegreeAnnouncement(),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child:
-                  _hackathonAnnouncement(),
-                ),
-                SizedBox(
-                  width: cardWidth,
-                  child:
-                  _academicAnnouncement(),
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _doubleDegreeAnnouncement() {
-    return PremiumHover(
-      child: Container(
-        height: 420,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: borderColor,
-          ),
-        ),
-        child: Column(
-          children: [
-            const Expanded(
-              child: AnnouncementMotionVisual(
-                mode:
-                AnnouncementVisualMode.partner,
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                24,
-                0,
-                24,
-                24,
-              ),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'INTERNATIONAL',
-                    style: TextStyle(
-                      color: iituRed,
-                      fontSize: 9,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Double Degree Programs',
-                    style: TextStyle(
-                      fontSize: 21,
-                      height: 1.12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Discover academic pathways with international partner universities.',
-                    style: TextStyle(
-                      color: greyText,
-                      fontSize: 12,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 13),
-                  TextButton.icon(
-                    onPressed: () {
-                      _showMessage(
-                        'Double Degree Programs selected.',
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: iituRed,
-                      padding: EdgeInsets.zero,
-                    ),
-                    icon: const Icon(
-                      Icons.arrow_forward,
-                      size: 15,
-                    ),
-                    label: const Text(
-                      'Explore programs',
-                    ),
-                  ),
-                ],
-              ),
+            const Icon(
+              Icons.arrow_forward_rounded,
+              color: iituRed,
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _hackathonAnnouncement() {
-    return PremiumHover(
-      child: InkWell(
-        borderRadius:
-        BorderRadius.circular(28),
-        onTap: () {
-          _openEvent(events[0]);
-        },
-        child: Container(
-          height: 420,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius:
-            BorderRadius.circular(28),
-            border: Border.all(
-              color: borderColor,
+// ============================================================
+// DASHBOARD GRID
+// ============================================================
+
+class DashboardGrid extends StatelessWidget {
+  final VoidCallback onSchedule;
+  final VoidCallback onServices;
+  final VoidCallback onEvents;
+  final VoidCallback onCampus;
+
+  const DashboardGrid({
+    super.key,
+    required this.onSchedule,
+    required this.onServices,
+    required this.onEvents,
+    required this.onCampus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (
+          context,
+          constraints,
+          ) {
+        double width;
+
+        if (constraints.maxWidth >= 900) {
+          width =
+              (constraints.maxWidth - 42) / 4;
+        } else if (constraints.maxWidth >=
+            600) {
+          width =
+              (constraints.maxWidth - 14) / 2;
+        } else {
+          width = constraints.maxWidth;
+        }
+
+        return Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            SizedBox(
+              width: width,
+              child: DashboardCard(
+                icon:
+                Icons.calendar_month_outlined,
+                title: 'Schedule',
+                subtitle:
+                'Timetable, calendar and planner.',
+                onTap: onSchedule,
+              ),
             ),
+            SizedBox(
+              width: width,
+              child: DashboardCard(
+                icon:
+                Icons.support_agent_outlined,
+                title: 'Services',
+                subtitle:
+                'Get help from campus services.',
+                onTap: onServices,
+              ),
+            ),
+            SizedBox(
+              width: width,
+              child: DashboardCard(
+                icon: Icons.event_outlined,
+                title: 'Events',
+                subtitle:
+                'Workshops, hackathons and careers.',
+                onTap: onEvents,
+              ),
+            ),
+            SizedBox(
+              width: width,
+              child: DashboardCard(
+                icon: Icons.map_outlined,
+                title: 'Campus',
+                subtitle:
+                'Explore university locations.',
+                onTap: onCampus,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class DashboardCard extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const DashboardCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  State<DashboardCard> createState() =>
+      _DashboardCardState();
+}
+
+class _DashboardCardState
+    extends State<DashboardCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius:
+        BorderRadius.circular(24),
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 190,
+          ),
+          height: 180,
+          padding: const EdgeInsets.all(23),
+          decoration: BoxDecoration(
+            color:
+            hover ? softRed : Colors.white,
+            borderRadius:
+            BorderRadius.circular(24),
+            border: Border.all(
+              color:
+              hover ? iituRed : borderColor,
+            ),
+            boxShadow: hover
+                ? [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(0.045),
+                blurRadius: 24,
+                offset:
+                const Offset(0, 10),
+              ),
+            ]
+                : [],
           ),
           child: Column(
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                height: 235,
-                width: double.infinity,
-                child: HoverImage(
-                  image:
-                  'assets/images/event_hackathon.jpg',
+              Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: hover
+                      ? Colors.white
+                      : softRed,
+                  borderRadius:
+                  BorderRadius.circular(15),
+                ),
+                child: Icon(
+                  widget.icon,
+                  color: iituRed,
                 ),
               ),
 
-              Expanded(
-                child: Padding(
-                  padding:
-                  const EdgeInsets.all(23),
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Text(
-                            '12 OCT 2026',
-                            style: TextStyle(
-                              color: iituRed,
-                              fontSize: 9,
-                              letterSpacing: 1,
-                              fontWeight:
-                              FontWeight.w600,
-                            ),
-                          ),
-                          Spacer(),
-                          Text(
-                            'HACKATHON',
-                            style: TextStyle(
-                              color: greyText,
-                              fontSize: 8.5,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 11),
-                      const Text(
-                        'Almaty Student Hackathon',
-                        style: TextStyle(
-                          fontSize: 20,
-                          height: 1.12,
-                          fontWeight:
-                          FontWeight.w600,
-                          letterSpacing: -0.6,
-                        ),
-                      ),
-                      const Spacer(),
-                      const Row(
-                        children: [
-                          Text(
-                            'View event',
-                            style: TextStyle(
-                              color: greyText,
-                              fontSize: 11,
-                            ),
-                          ),
-                          Spacer(),
-                          Icon(
-                            Icons.north_east,
-                            size: 16,
-                            color: iituRed,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              const Spacer(),
+
+              Text(
+                widget.title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.4,
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              Text(
+                widget.subtitle,
+                style: const TextStyle(
+                  color: greyText,
+                  fontSize: 10.5,
+                  height: 1.45,
                 ),
               ),
             ],
@@ -1609,210 +1588,41 @@ class _CampusPortalState extends State<CampusPortal> {
       ),
     );
   }
+}
 
-  Widget _academicAnnouncement() {
-    return PremiumHover(
-      child: Container(
-        height: 420,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFFAFB),
-              Color(0xFFF3F2F4),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: borderColor,
-          ),
-        ),
-        child: Column(
-          children: [
-            const Expanded(
-              child: AnnouncementMotionVisual(
-                mode:
-                AnnouncementVisualMode.academic,
-              ),
-            ),
+// ============================================================
+// HOME SUPPORT PROMO
+// ============================================================
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                24,
-                0,
-                24,
-                24,
-              ),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'ACADEMIC',
-                    style: TextStyle(
-                      color: iituRed,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Semester Updates',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Courses, schedules and key academic information in one place.',
-                    style: TextStyle(
-                      color: greyText,
-                      fontSize: 12,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 13),
-                  TextButton.icon(
-                    onPressed: () {
-                      _showMessage(
-                        'Academic updates selected.',
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: iituRed,
-                      padding: EdgeInsets.zero,
-                    ),
-                    icon: const Icon(
-                      Icons.arrow_forward,
-                      size: 15,
-                    ),
-                    label: const Text(
-                      'View updates',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class StudentSupportPromo extends StatelessWidget {
+  final VoidCallback onTap;
 
-  // ============================================================
-  // EVENTS HOME SECTION
-  // ============================================================
+  const StudentSupportPromo({
+    super.key,
+    required this.onTap,
+  });
 
-  Widget _eventsShowcase() {
-    final event = events[_eventIndex];
-
+  @override
+  Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment:
-          CrossAxisAlignment.end,
-          children: [
-            const Expanded(
-              child: PremiumHeading(
-                eyebrow: 'UPCOMING',
-                title: 'What’s happening next?',
-                subtitle:
-                'Explore workshops, hackathons and student opportunities.',
-              ),
-            ),
-
-            CircularArrowButton(
-              icon: Icons.arrow_back_rounded,
-              onTap: () {
-                setState(() {
-                  _eventIndex =
-                      (_eventIndex -
-                          1 +
-                          events.length) %
-                          events.length;
-                });
-              },
-            ),
-
-            const SizedBox(width: 8),
-
-            CircularArrowButton(
-              icon: Icons.arrow_forward_rounded,
-              onTap: () {
-                setState(() {
-                  _eventIndex =
-                      (_eventIndex + 1) %
-                          events.length;
-                });
-              },
-            ),
-          ],
+        const SectionHeading(
+          eyebrow: 'STUDENT SUPPORT',
+          title: 'Help when you need it.',
+          subtitle:
+          'Quick access to campus support without searching through university departments.',
         ),
 
         const SizedBox(height: 35),
 
-        AnimatedSwitcher(
-          duration: const Duration(
-            milliseconds: 420,
-          ),
-          child: _largeEventCard(
-            event,
-            key: ValueKey(_eventIndex),
-          ),
-        ),
-
-        const SizedBox(height: 17),
-
-        Row(
-          children: [
-            Expanded(
-              child: _eventDots(),
-            ),
-            TextButton.icon(
-              onPressed: () {
-                _changePage(1);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: iituRed,
-              ),
-              label: const Text(
-                'View all events',
-              ),
-              icon: const Icon(
-                Icons.arrow_forward,
-                size: 15,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _largeEventCard(
-      CampusEvent event, {
-        Key? key,
-      }) {
-    return PremiumHover(
-      key: key,
-      child: InkWell(
-        borderRadius:
-        BorderRadius.circular(30),
-        onTap: () {
-          _openEvent(event);
-        },
-        child: Container(
-          clipBehavior: Clip.antiAlias,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(36),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius:
-            BorderRadius.circular(30),
+            color: const Color(0xFFFBFBFC),
+            borderRadius: BorderRadius.circular(34),
             border: Border.all(
               color: borderColor,
             ),
@@ -1822,229 +1632,431 @@ class _CampusPortalState extends State<CampusPortal> {
                 context,
                 constraints,
                 ) {
-              final horizontal =
-                  constraints.maxWidth >= 720;
+              final desktop =
+                  constraints.maxWidth >= 850;
 
-              final image = SizedBox(
-                width: horizontal
-                    ? constraints.maxWidth *
-                    0.50
-                    : double.infinity,
-                height: horizontal ? 380 : 250,
-                child: HoverImage(
-                  image: event.image,
+              final features = const [
+                SupportFeature(
+                  Icons.flash_on_outlined,
+                  'Quick Help',
+                  'Find the right service quickly.',
                 ),
-              );
+                SupportFeature(
+                  Icons.report_problem_outlined,
+                  'Common Issues',
+                  'Wi-Fi, ID card, dormitory and documents.',
+                ),
+                SupportFeature(
+                  Icons.receipt_long_outlined,
+                  'Request Status',
+                  'See your latest request status.',
+                ),
+                SupportFeature(
+                  Icons.support_agent_outlined,
+                  'Service Request',
+                  'Submit an issue online.',
+                ),
+              ];
 
-              final info = Padding(
-                padding:
-                const EdgeInsets.all(31),
+              final mockup = Container(
+                width: 290,
+                padding: const EdgeInsets.all(25),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                  BorderRadius.circular(28),
+                  border: Border.all(
+                    color: borderColor,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black
+                          .withOpacity(0.045),
+                      blurRadius: 30,
+                      offset:
+                      const Offset(0, 14),
+                    ),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding:
-                      const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: softRed,
-                        borderRadius:
-                        BorderRadius.circular(
-                          30,
-                        ),
-                      ),
-                      child: Text(
-                        event.date,
-                        style: const TextStyle(
-                          color: iituRed,
-                          fontSize: 9.5,
-                          fontWeight:
-                          FontWeight.w600,
-                        ),
+                    SizedBox(
+                      width: 90,
+                      height: 34,
+                      child: AppAssetImage(
+                        path:
+                        'assets/images/iitu_logo.png',
+                        fit: BoxFit.contain,
+                        alignment:
+                        Alignment.centerLeft,
                       ),
                     ),
-
-                    const SizedBox(height: 19),
-
-                    Text(
-                      event.category.toUpperCase(),
-                      style: const TextStyle(
-                        color: iituRed,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-
-                    const SizedBox(height: 9),
-
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        fontSize: 29,
-                        height: 1.08,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -1,
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    Text(
-                      event.description,
-                      style: const TextStyle(
-                        color: greyText,
-                        fontSize: 12.5,
-                        height: 1.6,
-                      ),
-                    ),
-
                     const SizedBox(height: 21),
-
-                    Wrap(
-                      spacing: 18,
-                      runSpacing: 8,
-                      children: [
-                        _eventInfo(
-                          Icons.access_time_rounded,
-                          event.time,
-                        ),
-                        _eventInfo(
-                          Icons.location_on_outlined,
-                          event.location,
-                        ),
-                      ],
+                    const Text(
+                      'IITU Student Support',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight:
+                        FontWeight.w600,
+                      ),
                     ),
-
-                    const SizedBox(height: 25),
-
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        _openEvent(event);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: iituRed,
-                        foregroundColor:
-                        Colors.white,
-                        padding:
-                        const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 15,
+                    const SizedBox(height: 5),
+                    const Text(
+                      'How can we help?',
+                      style: TextStyle(
+                        color: greyText,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const SmallSupportRow(
+                      icon: Icons.wifi,
+                      text: 'Wi-Fi / Internet',
+                    ),
+                    const SmallSupportRow(
+                      icon: Icons.badge_outlined,
+                      text: 'Student ID Card',
+                    ),
+                    const SmallSupportRow(
+                      icon:
+                      Icons.description_outlined,
+                      text: 'Academic Documents',
+                    ),
+                    const SizedBox(height: 13),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: onTap,
+                        style:
+                        ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: iituRed,
+                          foregroundColor:
+                          Colors.white,
                         ),
-                      ),
-                      icon: const Icon(
-                        Icons.arrow_forward,
-                        size: 16,
-                      ),
-                      label: const Text(
-                        'View Event',
+                        child:
+                        const Text('Get Help'),
                       ),
                     ),
                   ],
                 ),
               );
 
-              if (!horizontal) {
+              if (!desktop) {
                 return Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
                   children: [
-                    image,
-                    info,
+                    mockup,
+                    const SizedBox(height: 25),
+                    ...features.map(
+                          (feature) =>
+                          SupportPromoRow(
+                            feature: feature,
+                          ),
+                    ),
                   ],
                 );
               }
 
               return Row(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
                 children: [
-                  image,
                   Expanded(
-                    child: info,
+                    child: Column(
+                      children: [
+                        SupportPromoRow(
+                          feature: features[0],
+                        ),
+                        SupportPromoRow(
+                          feature: features[1],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 36),
+                  mockup,
+                  const SizedBox(width: 36),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        SupportPromoRow(
+                          feature: features[2],
+                        ),
+                        SupportPromoRow(
+                          feature: features[3],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               );
             },
           ),
         ),
-      ),
-    );
-  }
 
-  Widget _eventDots() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(
-        events.length,
-            (index) {
-          return AnimatedContainer(
-            duration: const Duration(
-              milliseconds: 220,
-            ),
-            margin: const EdgeInsets.only(
-              right: 6,
-            ),
-            width:
-            index == _eventIndex ? 28 : 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: index == _eventIndex
-                  ? iituRed
-                  : const Color(0xFFD9D9DE),
-              borderRadius:
-              BorderRadius.circular(20),
-            ),
-          );
-        },
-      ),
-    );
-  }
+        const SizedBox(height: 20),
 
-  Widget _eventInfo(
-      IconData icon,
-      String value,
-      ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          color: iituRed,
-          size: 15,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            color: greyText,
-            fontSize: 11,
+        Align(
+          alignment: Alignment.center,
+          child: ElevatedButton.icon(
+            onPressed: onTap,
+            style: ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: iituRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
+              ),
+            ),
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              size: 17,
+            ),
+            label: const Text(
+              'Get Student Support',
+            ),
           ),
         ),
       ],
     );
   }
+}
 
-  // ============================================================
-  // CAMPUS LIFE
-  // ============================================================
+class SupportFeature {
+  final IconData icon;
+  final String title;
+  final String text;
 
-  Widget _campusLifeSection() {
+  const SupportFeature(
+      this.icon,
+      this.title,
+      this.text,
+      );
+}
+
+class SupportPromoRow extends StatelessWidget {
+  final SupportFeature feature;
+
+  const SupportPromoRow({
+    super.key,
+    required this.feature,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: 18,
+      ),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: softRed,
+              borderRadius:
+              BorderRadius.circular(14),
+            ),
+            child: Icon(
+              feature.icon,
+              color: iituRed,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  feature.title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                    FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  feature.text,
+                  style: const TextStyle(
+                    color: greyText,
+                    fontSize: 9.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SmallSupportRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const SmallSupportRow({
+    super.key,
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: 9,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: iituRed,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// HOME EVENTS PREVIEW
+// ============================================================
+
+class HomeEventsPreview extends StatelessWidget {
+  final VoidCallback onViewAll;
+
+  const HomeEventsPreview({
+    super.key,
+    required this.onViewAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
       children: [
-        const PremiumHeading(
+        Row(
+          crossAxisAlignment:
+          CrossAxisAlignment.end,
+          children: [
+            const Expanded(
+              child: SectionHeading(
+                eyebrow: 'UPCOMING',
+                title: 'What’s happening next?',
+                subtitle:
+                'Discover student events and opportunities.',
+              ),
+            ),
+            TextButton.icon(
+              onPressed: onViewAll,
+              icon: const Icon(
+                Icons.arrow_forward,
+                size: 15,
+              ),
+              label: const Text(
+                'View all',
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 30),
+
+        LayoutBuilder(
+          builder: (
+              context,
+              constraints,
+              ) {
+            double width;
+
+            if (constraints.maxWidth >= 900) {
+              width =
+                  (constraints.maxWidth - 28) / 3;
+            } else if (constraints.maxWidth >=
+                600) {
+              width =
+                  (constraints.maxWidth - 14) / 2;
+            } else {
+              width = constraints.maxWidth;
+            }
+
+            return Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: campusEvents.map(
+                    (event) {
+                  return SizedBox(
+                    width: width,
+                    child: EventPreviewCard(
+                      event: event,
+                      onTap: onViewAll,
+                    ),
+                  );
+                },
+              ).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// CAMPUS LIFE
+// ============================================================
+
+class CampusLifeSection extends StatelessWidget {
+  const CampusLifeSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        const SectionHeading(
           eyebrow: 'CAMPUS LIFE',
           title: 'Designed for more than classes.',
           subtitle:
-          'Discover spaces for study, collaboration, research and student life.',
+          'Study, collaborate, research and explore university life.',
         ),
 
-        const SizedBox(height: 36),
+        const SizedBox(height: 30),
 
         LayoutBuilder(
           builder: (
@@ -2055,92 +2067,84 @@ class _CampusPortalState extends State<CampusPortal> {
                 constraints.maxWidth >= 850;
 
             if (!desktop) {
-              return Column(
+              return const Column(
                 children: [
                   SizedBox(
                     height: 280,
-                    child: CampusVisualCard(
+                    child: CampusImageCard(
                       image:
                       'assets/images/campus_building.jpg',
                       title:
                       'Academic Building',
                       subtitle:
-                      'Modern spaces for learning and collaboration.',
-                      number: '01',
+                      'Modern spaces for learning.',
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: 15),
                   SizedBox(
-                    height: 260,
-                    child: CampusVisualCard(
+                    height: 250,
+                    child: CampusImageCard(
                       image:
                       'assets/images/campus_lab.png',
                       title:
                       'Technology Labs',
                       subtitle:
                       'Build. Test. Innovate.',
-                      number: '02',
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: 15),
                   SizedBox(
-                    height: 260,
-                    child: CampusVisualCard(
+                    height: 250,
+                    child: CampusImageCard(
                       image:
                       'assets/images/campus_library.jpg',
                       title: 'Library',
                       subtitle:
                       'Read. Research. Focus.',
-                      number: '03',
                     ),
                   ),
                 ],
               );
             }
 
-            return SizedBox(
-              height: 495,
+            return const SizedBox(
+              height: 470,
               child: Row(
                 children: [
                   Expanded(
                     flex: 3,
-                    child: CampusVisualCard(
+                    child: CampusImageCard(
                       image:
                       'assets/images/campus_building.jpg',
                       title:
                       'Academic Building',
                       subtitle:
-                      'Modern classrooms, collaborative spaces and technology-driven learning.',
-                      number: '01',
+                      'Modern spaces for learning and collaboration.',
                     ),
                   ),
-
-                  const SizedBox(width: 18),
-
+                  SizedBox(width: 16),
                   Expanded(
                     flex: 2,
                     child: Column(
                       children: [
                         Expanded(
-                          child: CampusVisualCard(
+                          child: CampusImageCard(
                             image:
                             'assets/images/campus_lab.png',
                             title:
                             'Technology Labs',
                             subtitle:
                             'Build. Test. Innovate.',
-                            number: '02',
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        SizedBox(height: 16),
                         Expanded(
-                          child: CampusVisualCard(
+                          child: CampusImageCard(
                             image:
                             'assets/images/campus_library.jpg',
                             title: 'Library',
                             subtitle:
                             'Read. Research. Focus.',
-                            number: '03',
                           ),
                         ),
                       ],
@@ -2151,1057 +2155,648 @@ class _CampusPortalState extends State<CampusPortal> {
             );
           },
         ),
-
-        const SizedBox(height: 20),
-
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () {
-              _changePage(2);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: iituRed,
-            ),
-            label: const Text(
-              'Explore campus',
-            ),
-            icon: const Icon(
-              Icons.arrow_forward,
-              size: 15,
-            ),
-          ),
-        ),
       ],
     );
   }
+}
 
-  // ============================================================
-  // GLOBAL FOOTER
-  // ============================================================
+// ============================================================
+// TIMETABLE / SCHEDULE & PLANNER
+// ============================================================
 
-  Widget _globalFooter() {
-    return Container(
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            navy,
-            navyLight,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(36),
-      ),
-      child: LayoutBuilder(
-        builder: (
-            context,
-            constraints,
-            ) {
-          final desktop =
-              constraints.maxWidth >= 800;
+class TimetableScreen extends StatefulWidget {
+  const TimetableScreen({super.key});
 
-          final copy = Padding(
-            padding: const EdgeInsets.all(44),
-            child: Column(
-              mainAxisAlignment:
-              MainAxisAlignment.center,
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'GLOBAL COMMUNITY',
-                  style: TextStyle(
-                    color: Color(0xFF8FC8E8),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Grow beyond\nborders with IITU.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 39,
-                    height: 1.05,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: -1.5,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const SizedBox(
-                  width: 470,
-                  child: Text(
-                    'Connect with international opportunities, innovation and a global academic community from Kazakhstan.',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      height: 1.6,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 26),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    _showMessage(
-                      'International opportunities selected.',
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: Colors.white,
-                    foregroundColor: navy,
-                    padding:
-                    const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 15,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.north_east,
-                    size: 16,
-                  ),
-                  label: const Text(
-                    'Discover Opportunities',
-                  ),
-                ),
-              ],
-            ),
-          );
+  @override
+  State<TimetableScreen> createState() =>
+      _TimetableScreenState();
+}
 
-          if (!desktop) {
-            return Column(
-              children: [
-                copy,
-                const SizedBox(
-                  height: 310,
-                  child: Center(
-                    child: AnimatedGlobe(),
-                  ),
-                ),
-              ],
-            );
-          }
+class _TimetableScreenState
+    extends State<TimetableScreen> {
+  final TextEditingController _plannerController =
+  TextEditingController();
 
-          return SizedBox(
-            height: 415,
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: copy,
-                ),
-                const Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: AnimatedGlobe(),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+  DateTime _selectedDate = DateTime.now();
+  TimeOfDay _selectedTime =
+  const TimeOfDay(hour: 18, minute: 0);
+
+  final List<PlannerItem> _plannerItems = [];
+
+  @override
+  void dispose() {
+    _plannerController.dispose();
+    super.dispose();
   }
 
-  // ============================================================
-  // EVENTS PAGE
-  // ============================================================
-
-  Widget _eventsPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        24,
-        60,
-        24,
-        100,
-      ),
-      child: _maxWidth(
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            const PremiumHeading(
-              eyebrow: 'WHAT’S HAPPENING',
-              title: 'Upcoming Events',
-              subtitle:
-              'Discover academic, career and student opportunities at IITU.',
-            ),
-
-            const SizedBox(height: 38),
-
-            LayoutBuilder(
-              builder: (
-                  context,
-                  constraints,
-                  ) {
-                double cardWidth;
-
-                if (constraints.maxWidth >= 1000) {
-                  cardWidth =
-                      (constraints.maxWidth - 36) /
-                          3;
-                } else if (constraints.maxWidth >=
-                    650) {
-                  cardWidth =
-                      (constraints.maxWidth - 18) /
-                          2;
-                } else {
-                  cardWidth =
-                      constraints.maxWidth;
-                }
-
-                return Wrap(
-                  spacing: 18,
-                  runSpacing: 18,
-                  children: events.map(
-                        (event) {
-                      return SizedBox(
-                        width: cardWidth,
-                        child: EventPageCard(
-                          event: event,
-                          onTap: () {
-                            _openEvent(event);
-                          },
-                        ),
-                      );
-                    },
-                  ).toList(),
-                );
-              },
-            ),
-          ],
-        ),
+  Future<void> _chooseDate() async {
+    final result = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(
+        DateTime.now().year + 2,
       ),
     );
+
+    if (result != null) {
+      setState(() {
+        _selectedDate = result;
+      });
+    }
   }
 
-  // ============================================================
-  // CAMPUS PAGE
-  // ============================================================
+  Future<void> _chooseTime() async {
+    final result = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
 
-  Widget _campusPage() {
-    final places =
-    _placesForFloor(_floor);
+    if (result != null) {
+      setState(() {
+        _selectedTime = result;
+      });
+    }
+  }
 
-    if (_selectedPlace >= places.length) {
-      _selectedPlace = 0;
+  void _addPlannerItem() {
+    final title =
+    _plannerController.text.trim();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please enter a planner title.',
+          ),
+        ),
+      );
+      return;
     }
 
-    final selected =
-    places[_selectedPlace];
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        24,
-        60,
-        24,
-        100,
-      ),
-      child: _maxWidth(
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            const PremiumHeading(
-              eyebrow: 'CAMPUS NAVIGATOR',
-              title: 'Explore IITU Campus',
-              subtitle:
-              'Choose a level and discover student spaces across the university.',
-            ),
-
-            const SizedBox(height: 32),
-
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: List.generate(
-                5,
-                    (index) {
-                  final floor = index + 1;
-                  final active =
-                      floor == _floor;
-
-                  return InkWell(
-                    borderRadius:
-                    BorderRadius.circular(30),
-                    onTap: () {
-                      setState(() {
-                        _floor = floor;
-                        _selectedPlace = 0;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(
-                        milliseconds: 190,
-                      ),
-                      padding:
-                      const EdgeInsets.symmetric(
-                        horizontal: 25,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? iituRed
-                            : Colors.white,
-                        borderRadius:
-                        BorderRadius.circular(30),
-                        border: Border.all(
-                          color: active
-                              ? iituRed
-                              : borderColor,
-                        ),
-                      ),
-                      child: Text(
-                        'Level $floor',
-                        style: TextStyle(
-                          color: active
-                              ? Colors.white
-                              : greyText,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            LayoutBuilder(
-              builder: (
-                  context,
-                  constraints,
-                  ) {
-                final desktop =
-                    constraints.maxWidth >= 850;
-
-                if (!desktop) {
-                  return Column(
-                    children: [
-                      _floorMap(
-                        places,
-                        selected,
-                      ),
-                      const SizedBox(height: 20),
-                      _floorMenu(places),
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 235,
-                      child: _floorMenu(
-                        places,
-                      ),
-                    ),
-                    const SizedBox(width: 22),
-                    Expanded(
-                      child: _floorMap(
-                        places,
-                        selected,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-
-            const SizedBox(height: 90),
-
-            _campusLifeSection(),
-          ],
+    setState(() {
+      _plannerItems.add(
+        PlannerItem(
+          title: title,
+          date: _selectedDate,
+          time: _selectedTime,
         ),
-      ),
-    );
+      );
+
+      _plannerController.clear();
+    });
   }
 
-  Widget _floorMenu(
-      List<FloorPlace> places,
+  String _dateText(
+      DateTime date,
       ) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: borderColor,
-        ),
-      ),
-      child: Column(
-        children: List.generate(
-          places.length,
-              (index) {
-            final active =
-                index == _selectedPlace;
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
 
-            return InkWell(
-              borderRadius:
-              BorderRadius.circular(14),
-              onTap: () {
-                setState(() {
-                  _selectedPlace = index;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(
-                  milliseconds: 180,
-                ),
-                padding:
-                const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 13,
-                ),
-                margin: const EdgeInsets.only(
-                  bottom: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: active
-                      ? softRed
-                      : Colors.transparent,
-                  borderRadius:
-                  BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      places[index].icon,
-                      size: 18,
-                      color: active
-                          ? iituRed
-                          : greyText,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        places[index].name,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: active
-                              ? iituRed
-                              : darkText,
-                          fontWeight: active
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
-  Widget _floorMap(
-      List<FloorPlace> places,
-      FloorPlace selected,
-      ) {
-    return Container(
-      height: 520,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: borderColor,
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.timetable,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          24,
+          55,
+          24,
+          90,
         ),
-      ),
-      child: LayoutBuilder(
-        builder: (
-            context,
-            constraints,
-            ) {
-          final w = constraints.maxWidth;
-          final h = constraints.maxHeight;
-
-          return Stack(
+        child: MaxWidth(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
-              Positioned(
-                left: w * 0.07,
-                top: h * 0.10,
-                width: w * 0.86,
-                height: h * 0.67,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(
-                      0xFFF2F3F6,
-                    ),
-                    borderRadius:
-                    BorderRadius.circular(25),
-                    border: Border.all(
-                      color: const Color(
-                        0xFFD0D3DA,
-                      ),
-                    ),
-                  ),
-                ),
+              const SectionHeading(
+                eyebrow: 'STUDENT SCHEDULE',
+                title: 'Schedule & Planner',
+                subtitle:
+                'View your weekly timetable, choose dates and plan university tasks.',
               ),
 
-              _room(
-                w * 0.12,
-                h * 0.16,
-                w * 0.22,
-                h * 0.22,
-                const Color(0xFFFFE7EB),
-              ),
+              const SizedBox(height: 32),
 
-              _room(
-                w * 0.12,
-                h * 0.44,
-                w * 0.22,
-                h * 0.24,
-                const Color(0xFFFFF0DC),
-              ),
+              LayoutBuilder(
+                builder: (
+                    context,
+                    constraints,
+                    ) {
+                  final desktop =
+                      constraints.maxWidth >= 920;
 
-              _room(
-                w * 0.66,
-                h * 0.16,
-                w * 0.22,
-                h * 0.22,
-                const Color(0xFFE7EEFA),
-              ),
-
-              _room(
-                w * 0.66,
-                h * 0.44,
-                w * 0.22,
-                h * 0.24,
-                const Color(0xFFEEE7FA),
-              ),
-
-              Positioned(
-                left: w * 0.39,
-                top: h * 0.17,
-                width: w * 0.22,
-                height: h * 0.51,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(
-                      0xFFE7F1EA,
-                    ),
-                    borderRadius:
-                    BorderRadius.circular(15),
-                  ),
-                ),
-              ),
-
-              ...List.generate(
-                places.length,
-                    (index) {
-                  final place = places[index];
-                  final active =
-                      index == _selectedPlace;
-
-                  return Align(
-                    alignment: place.position,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedPlace = index;
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(
-                          milliseconds: 180,
-                        ),
-                        width: active ? 46 : 38,
-                        height: active ? 46 : 38,
-                        decoration: BoxDecoration(
-                          color: active
-                              ? iituRed
-                              : Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: iituRed,
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withOpacity(
-                                0.10,
-                              ),
-                              blurRadius: 12,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          place.icon,
-                          size: 18,
-                          color: active
-                              ? Colors.white
-                              : iituRed,
-                        ),
-                      ),
-                    ),
+                  final timetable = WeeklyTimetable(
+                    plannerItems: _plannerItems,
                   );
-                },
-              ),
 
-              AnimatedAlign(
-                duration: const Duration(
-                  milliseconds: 620,
-                ),
-                curve: Curves.easeInOutCubic,
-                alignment: selected.position,
-                child: Transform.translate(
-                  offset:
-                  const Offset(0, -47),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: darkText,
-                      borderRadius:
-                      BorderRadius.circular(11),
-                    ),
-                    child: const Icon(
-                      Icons.directions_walk_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                top: 18,
-                right: 18,
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: softRed,
-                    borderRadius:
-                    BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    'Level $_floor',
-                    style: const TextStyle(
-                      color: iituRed,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 20,
-                child: Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius:
-                    BorderRadius.circular(17),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black
-                            .withOpacity(
-                          0.055,
-                        ),
-                        blurRadius: 18,
-                      ),
-                    ],
-                  ),
-                  child: Row(
+                  final planner = Column(
                     children: [
-                      Icon(
-                        selected.icon,
-                        color: iituRed,
+                      CalendarPanel(
+                        selectedDate:
+                        _selectedDate,
+                        onDateSelected:
+                            (date) {
+                          setState(() {
+                            _selectedDate =
+                                date;
+                          });
+                        },
                       ),
-                      const SizedBox(width: 11),
-                      Expanded(
+
+                      const SizedBox(height: 17),
+
+                      Container(
+                        width: double.infinity,
+                        padding:
+                        const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                          BorderRadius.circular(
+                            26,
+                          ),
+                          border: Border.all(
+                            color: borderColor,
+                          ),
+                        ),
                         child: Column(
                           crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                          CrossAxisAlignment
+                              .start,
                           children: [
-                            Text(
-                              selected.name,
-                              style: const TextStyle(
-                                fontSize: 12.5,
+                            const Text(
+                              'ADD TO PLANNER',
+                              style: TextStyle(
+                                color: iituRed,
+                                fontSize: 9,
+                                fontWeight:
+                                FontWeight.w600,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            const Text(
+                              'Plan your day',
+                              style: TextStyle(
+                                fontSize: 19,
                                 fontWeight:
                                 FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              selected.description,
-                              style: const TextStyle(
-                                color: greyText,
-                                fontSize: 10.5,
+
+                            const SizedBox(height: 17),
+
+                            TextField(
+                              controller:
+                              _plannerController,
+                              decoration:
+                              const InputDecoration(
+                                labelText: 'Title',
+                                hintText:
+                                'Finish ML assignment',
+                              ),
+                            ),
+
+                            const SizedBox(height: 13),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                      17,
+                                    ),
+                                    onTap:
+                                    _chooseDate,
+                                    child: InputLikeBox(
+                                      icon: Icons
+                                          .calendar_month_outlined,
+                                      text: _dateText(
+                                        _selectedDate,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 10),
+
+                                Expanded(
+                                  child: InkWell(
+                                    borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                      17,
+                                    ),
+                                    onTap:
+                                    _chooseTime,
+                                    child: InputLikeBox(
+                                      icon: Icons
+                                          .access_time_outlined,
+                                      text:
+                                      _selectedTime
+                                          .format(
+                                        context,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child:
+                              ElevatedButton(
+                                onPressed:
+                                _addPlannerItem,
+                                style:
+                                ElevatedButton
+                                    .styleFrom(
+                                  elevation: 0,
+                                  backgroundColor:
+                                  iituRed,
+                                  foregroundColor:
+                                  Colors.white,
+                                  padding:
+                                  const EdgeInsets
+                                      .symmetric(
+                                    vertical: 15,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Add to Planner',
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+                  );
 
-  Widget _room(
-      double left,
-      double top,
-      double width,
-      double height,
-      Color color,
-      ) {
-    return Positioned(
-      left: left,
-      top: top,
-      width: width,
-      height: height,
-      child: Container(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
-  }
+                  if (!desktop) {
+                    return Column(
+                      children: [
+                        timetable,
+                        const SizedBox(height: 22),
+                        planner,
+                      ],
+                    );
+                  }
 
-  List<FloorPlace> _placesForFloor(
-      int floor,
-      ) {
-    switch (floor) {
-      case 1:
-        return const [
-          FloorPlace(
-            name: 'Main Entrance',
-            description:
-            'University entrance and reception.',
-            icon:
-            Icons.door_front_door_outlined,
-            position:
-            Alignment(-0.70, 0.42),
-          ),
-          FloorPlace(
-            name: 'Cafeteria',
-            description:
-            'Student dining and coffee area.',
-            icon: Icons.restaurant_outlined,
-            position:
-            Alignment(0.58, 0.40),
-          ),
-          FloorPlace(
-            name: 'Student Services',
-            description:
-            'Student support and information.',
-            icon:
-            Icons.support_agent_outlined,
-            position:
-            Alignment(-0.32, -0.36),
-          ),
-          FloorPlace(
-            name: 'Event Hall',
-            description:
-            'Presentations and university events.',
-            icon: Icons.groups_outlined,
-            position:
-            Alignment(0.54, -0.37),
-          ),
-        ];
-
-      case 2:
-        return const [
-          FloorPlace(
-            name: 'Classrooms',
-            description:
-            'General teaching classrooms.',
-            icon: Icons.school_outlined,
-            position:
-            Alignment(-0.56, -0.38),
-          ),
-          FloorPlace(
-            name: 'Computer Lab',
-            description:
-            'Computer laboratory for practical classes.',
-            icon: Icons.computer,
-            position:
-            Alignment(0.52, -0.36),
-          ),
-          FloorPlace(
-            name: 'Study Area',
-            description:
-            'Collaborative student study space.',
-            icon:
-            Icons.chair_alt_outlined,
-            position:
-            Alignment(-0.05, 0.43),
-          ),
-        ];
-
-      case 3:
-        return const [
-          FloorPlace(
-            name: 'Library',
-            description:
-            'Books, digital resources and study space.',
-            icon:
-            Icons.local_library_outlined,
-            position:
-            Alignment(-0.56, -0.38),
-          ),
-          FloorPlace(
-            name: 'Reading Zone',
-            description:
-            'Quiet individual reading area.',
-            icon: Icons.menu_book_outlined,
-            position:
-            Alignment(0.50, -0.36),
-          ),
-          FloorPlace(
-            name: 'Discussion Rooms',
-            description:
-            'Rooms for teamwork and group study.',
-            icon: Icons.groups_2_outlined,
-            position:
-            Alignment(0.05, 0.43),
-          ),
-        ];
-
-      case 4:
-        return const [
-          FloorPlace(
-            name: 'Research Labs',
-            description:
-            'Technical and research laboratory spaces.',
-            icon: Icons.science_outlined,
-            position:
-            Alignment(-0.56, -0.38),
-          ),
-          FloorPlace(
-            name: 'Innovation Hub',
-            description:
-            'Projects, startups and innovation.',
-            icon: Icons.lightbulb_outline,
-            position:
-            Alignment(0.50, -0.36),
-          ),
-          FloorPlace(
-            name: 'Meeting Rooms',
-            description:
-            'Group discussions and meetings.',
-            icon:
-            Icons.meeting_room_outlined,
-            position:
-            Alignment(0.05, 0.43),
-          ),
-        ];
-
-      default:
-        return const [
-          FloorPlace(
-            name: 'Faculty Offices',
-            description:
-            'Academic and faculty offices.',
-            icon: Icons.business_outlined,
-            position:
-            Alignment(-0.56, -0.38),
-          ),
-          FloorPlace(
-            name: 'Conference Room',
-            description:
-            'Academic meetings and presentations.',
-            icon:
-            Icons.co_present_outlined,
-            position:
-            Alignment(0.50, -0.36),
-          ),
-          FloorPlace(
-            name: 'Quiet Study Space',
-            description:
-            'Individual study and focus area.',
-            icon:
-            Icons.library_books_outlined,
-            position:
-            Alignment(0.05, 0.43),
-          ),
-        ];
-    }
-  }
-
-  // ============================================================
-  // PROFILE
-  // ============================================================
-
-  Widget _profilePage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        24,
-        60,
-        24,
-        100,
-      ),
-      child: _maxWidth(
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            const PremiumHeading(
-              eyebrow: 'STUDENT PROFILE',
-              title: 'Your academic space.',
-              subtitle:
-              'Personal information, academic progress and student activity in one place.',
-            ),
-
-            const SizedBox(height: 38),
-
-            LayoutBuilder(
-              builder: (
-                  context,
-                  constraints,
-                  ) {
-                final desktop =
-                    constraints.maxWidth >= 900;
-
-                if (!desktop) {
-                  return Column(
+                  return Row(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
                     children: [
-                      _profileCard(),
-                      const SizedBox(height: 28),
-                      _profileAcademicSection(),
+                      Expanded(
+                        flex: 3,
+                        child: timetable,
+                      ),
+                      const SizedBox(width: 22),
+                      SizedBox(
+                        width: 360,
+                        child: planner,
+                      ),
                     ],
                   );
-                }
+                },
+              ),
 
-                return Row(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 335,
-                      child: _profileCard(),
-                    ),
-                    const SizedBox(width: 25),
-                    Expanded(
-                      child:
-                      _profileAcademicSection(),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
+              if (_plannerItems.isNotEmpty) ...[
+                const SizedBox(height: 30),
+
+                const Text(
+                  'Your planner',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+
+                const SizedBox(height: 15),
+
+                ..._plannerItems.map(
+                      (item) {
+                    return PlannerItemCard(
+                      item: item,
+                      onToggle: () {
+                        setState(() {
+                          item.completed =
+                          !item.completed;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _profileCard() {
+class WeeklyTimetable extends StatelessWidget {
+  final List<PlannerItem> plannerItems;
+
+  const WeeklyTimetable({
+    super.key,
+    required this.plannerItems,
+  });
+
+  static const days = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+  ];
+
+  static const times = [
+    '09:00',
+    '11:00',
+    '14:00',
+    '16:00',
+    '18:00',
+  ];
+
+  ClassItem? _findItem(
+      int day,
+      int slot,
+      ) {
+    for (final item in classItems) {
+      if (item.day == day &&
+          item.timeSlot == slot) {
+        return item;
+      }
+    }
+
+    return null;
+  }
+
+  DateTime _startOfWeek(DateTime date) {
+    final cleanDate = DateTime(date.year, date.month, date.day);
+    return cleanDate.subtract(Duration(days: cleanDate.weekday - 1));
+  }
+
+  bool _isThisWeek(DateTime date) {
+    final start = _startOfWeek(DateTime.now());
+    final end = start.add(const Duration(days: 7));
+    final taskDate = DateTime(date.year, date.month, date.day);
+    return !taskDate.isBefore(start) && taskDate.isBefore(end);
+  }
+
+  int _closestTimeSlot(TimeOfDay time) {
+    final taskMinutes = time.hour * 60 + time.minute;
+    const slots = [9 * 60, 11 * 60, 14 * 60, 16 * 60, 18 * 60];
+
+    var closestIndex = 0;
+    var smallestDifference = (taskMinutes - slots.first).abs();
+
+    for (var i = 1; i < slots.length; i++) {
+      final difference = (taskMinutes - slots[i]).abs();
+      if (difference < smallestDifference) {
+        smallestDifference = difference;
+        closestIndex = i;
+      }
+    }
+
+    return closestIndex;
+  }
+
+  List<PlannerItem> _tasksForCell(int day, int slot) {
+    return plannerItems.where((task) {
+      final taskDay = task.date.weekday - 1;
+      return _isThisWeek(task.date) &&
+          taskDay == day &&
+          _closestTimeSlot(task.time) == slot;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: borderColor,
         ),
       ),
       child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 112,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  iituDarkRed,
-                  iituRed,
-                ],
-              ),
-            ),
-          ),
-
-          Transform.translate(
-            offset: const Offset(0, -55),
-            child: const CircleAvatar(
-              radius: 59,
-              backgroundColor: Colors.white,
-              child: CircleAvatar(
-                radius: 53,
-                backgroundImage: AssetImage(
-                  'assets/images/profile_irada.png',
-                ),
-              ),
-            ),
-          ),
-
-          Transform.translate(
-            offset: const Offset(0, -40),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: 25,
-              ),
-              child: Column(
+          Row(
+            children: [
+              const Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Akvarzhanova Irada',
-                    textAlign: TextAlign.center,
+                    'WEEKLY TIMETABLE',
                     style: TextStyle(
-                      fontSize: 21,
+                      color: iituRed,
+                      fontSize: 9,
+                      letterSpacing: 1.3,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: -0.5,
                     ),
                   ),
                   SizedBox(height: 6),
                   Text(
-                    'Network Security',
+                    'This week',
                     style: TextStyle(
-                      color: iituRed,
-                      fontSize: 12.5,
+                      fontSize: 22,
                       fontWeight: FontWeight.w600,
+                      letterSpacing: -0.6,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    '3rd Year · Student ID 41151',
-                    style: TextStyle(
-                      color: greyText,
-                      fontSize: 11,
-                    ),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: softRed,
+                  borderRadius:
+                  BorderRadius.circular(30),
+                ),
+                child: const Text(
+                  '5 classes',
+                  style: TextStyle(
+                    color: iituRed,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
                   ),
-                  SizedBox(height: 22),
-                  Divider(),
-                  SizedBox(height: 12),
-                  ProfileLine(
-                    icon: Icons.email_outlined,
-                    text:
-                    'irada41151@student.iitu.kz',
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: 850,
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 66,
+                      ),
+                      ...days.map(
+                            (day) => Expanded(
+                          child: Container(
+                            height: 45,
+                            alignment:
+                            Alignment.center,
+                            decoration:
+                            const BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: borderColor,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              day,
+                              style:
+                              const TextStyle(
+                                color: greyText,
+                                fontSize: 10.5,
+                                fontWeight:
+                                FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  ProfileLine(
-                    icon: Icons.school_outlined,
-                    text:
-                    'International Information Technology University',
-                  ),
-                  ProfileLine(
-                    icon:
-                    Icons.location_on_outlined,
-                    text: 'Kazakhstan',
+
+                  ...List.generate(
+                    times.length,
+                        (slot) {
+                      return Row(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 66,
+                            height: 132,
+                            alignment:
+                            Alignment.topCenter,
+                            padding:
+                            const EdgeInsets
+                                .only(
+                              top: 14,
+                            ),
+                            decoration:
+                            const BoxDecoration(
+                              border: Border(
+                                right: BorderSide(
+                                  color: borderColor,
+                                ),
+                                bottom: BorderSide(
+                                  color: borderColor,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              times[slot],
+                              style:
+                              const TextStyle(
+                                color: greyText,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+
+                          ...List.generate(
+                            days.length,
+                                (day) {
+                              final item =
+                              _findItem(
+                                day,
+                                slot,
+                              );
+                              final tasks = _tasksForCell(day, slot);
+
+                              return Expanded(
+                                child: Container(
+                                  height: 132,
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    border: Border(
+                                      right: BorderSide(color: borderColor),
+                                      bottom: BorderSide(color: borderColor),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      if (item != null)
+                                        Expanded(
+                                          child: ClassCard(item: item),
+                                        )
+                                      else if (tasks.isEmpty)
+                                        const Expanded(child: SizedBox()),
+                                      if (tasks.isNotEmpty) ...[
+                                        if (item != null)
+                                          const SizedBox(height: 5),
+                                        PlannerTaskMiniCard(task: tasks.first),
+                                        if (tasks.length > 1)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 3),
+                                            child: Text(
+                                              '+${tasks.length - 1} more',
+                                              style: const TextStyle(
+                                                color: Color(0xFF4169A1),
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -3211,323 +2806,504 @@ class _CampusPortalState extends State<CampusPortal> {
       ),
     );
   }
+}
 
-  Widget _profileAcademicSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: borderColor,
+class ClassCard extends StatelessWidget {
+  final ClassItem item;
+
+  const ClassCard({
+    super.key,
+    required this.item,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: item.nextClass
+            ? softRed
+            : const Color(0xFFF3F4F7),
+        borderRadius:
+        BorderRadius.circular(14),
+        border: Border.all(
+          color: item.nextClass
+              ? iituRed
+              : borderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          if (item.nextClass)
+            const Text(
+              'NEXT CLASS',
+              style: TextStyle(
+                color: iituRed,
+                fontSize: 7.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
+            ),
+
+          if (item.nextClass)
+            const SizedBox(height: 4),
+
+          Text(
+            item.module,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+
+          const Spacer(),
+
+          Text(
+            item.room,
+            style: const TextStyle(
+              color: greyText,
+              fontSize: 8.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PlannerTaskMiniCard extends StatelessWidget {
+  final PlannerItem task;
+
+  const PlannerTaskMiniCard({
+    super.key,
+    required this.task,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const taskBlue = Color(0xFF4169A1);
+    const taskBackground = Color(0xFFEAF2FF);
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: task.completed ? 0.5 : 1,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: taskBackground,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: taskBlue.withOpacity(0.30)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              task.completed
+                  ? Icons.check_circle_rounded
+                  : Icons.assignment_outlined,
+              size: 13,
+              color: taskBlue,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TASK',
+                    style: TextStyle(
+                      color: taskBlue,
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  Text(
+                    task.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      decoration: task.completed
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              task.time.format(context),
+              style: const TextStyle(
+                color: taskBlue,
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// CALENDAR PANEL
+// ============================================================
+
+class CalendarPanel extends StatelessWidget {
+  final DateTime selectedDate;
+  final ValueChanged<DateTime>
+  onDateSelected;
+
+  const CalendarPanel({
+    super.key,
+    required this.selectedDate,
+    required this.onDateSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final first =
+    DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      1,
+    );
+
+    final daysInMonth = DateTime(
+      selectedDate.year,
+      selectedDate.month + 1,
+      0,
+    ).day;
+
+    final offset = first.weekday % 7;
+
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final totalCells = 42;
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFB71930),
+            Color(0xFF8B1123),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Text(
-                'ACADEMIC OVERVIEW',
-                style: TextStyle(
-                  color: iituRed,
-                  fontSize: 9,
+              Text(
+                '${monthNames[selectedDate.month - 1]} ${selectedDate.year}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 1.3,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Current progress',
-                style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.7,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'A quick summary of your academic performance this semester.',
-                style: TextStyle(
-                  color: greyText,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 27),
-
-              LayoutBuilder(
-                builder: (
-                    context,
-                    constraints,
-                    ) {
-                  final desktop =
-                      constraints.maxWidth >= 650;
-
-                  final width = desktop
-                      ? (constraints.maxWidth - 36) /
-                      4
-                      : (constraints.maxWidth - 12) /
-                      2;
-
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      SizedBox(
-                        width: width,
-                        child:
-                        const AcademicMetricCard(
-                          icon:
-                          Icons.calendar_month_outlined,
-                          label: 'SEMESTER',
-                          value: '5',
-                          caption: 'Current',
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child:
-                        const AcademicMetricCard(
-                          icon:
-                          Icons.trending_up_rounded,
-                          label: 'GPA',
-                          value: '3.5',
-                          caption: 'Good standing',
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child:
-                        const AcademicMetricCard(
-                          icon:
-                          Icons.school_outlined,
-                          label: 'CREDITS',
-                          value: '90',
-                          caption: 'Completed',
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child:
-                        const AcademicMetricCard(
-                          icon:
-                          Icons.check_circle_outline,
-                          label: 'ATTENDANCE',
-                          value: '92%',
-                          caption: 'On track',
-                        ),
-                      ),
-                    ],
+              const Spacer(),
+              IconButton(
+                onPressed: () {
+                  final previous =
+                  DateTime(
+                    selectedDate.year,
+                    selectedDate.month - 1,
+                    1,
                   );
+
+                  onDateSelected(previous);
                 },
+                icon: const Icon(
+                  Icons.chevron_left,
+                  color: Colors.white,
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  final next =
+                  DateTime(
+                    selectedDate.year,
+                    selectedDate.month + 1,
+                    1,
+                  );
+
+                  onDateSelected(next);
+                },
+                icon: const Icon(
+                  Icons.chevron_right,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
-        ),
 
-        const SizedBox(height: 25),
+          const SizedBox(height: 15),
 
-        const Text(
-          'Academic Records',
-          style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
+          const Row(
+            children: [
+              CalendarDayLabel('Sun'),
+              CalendarDayLabel('Mon'),
+              CalendarDayLabel('Tue'),
+              CalendarDayLabel('Wed'),
+              CalendarDayLabel('Thu'),
+              CalendarDayLabel('Fri'),
+              CalendarDayLabel('Sat'),
+            ],
           ),
-        ),
 
-        const SizedBox(height: 15),
+          const SizedBox(height: 8),
 
-        _academicRecords(),
-      ],
-    );
-  }
+          GridView.builder(
+            shrinkWrap: true,
+            physics:
+            const NeverScrollableScrollPhysics(),
+            gridDelegate:
+            const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1,
+            ),
+            itemCount: totalCells,
+            itemBuilder: (
+                context,
+                index,
+                ) {
+              final day =
+                  index - offset + 1;
 
-  Widget _academicRecords() {
-    const items = [
-      AcademicItem(
-        Icons.description_outlined,
-        'Transcript',
-        'Academic record',
-      ),
-      AcademicItem(
-        Icons.verified_outlined,
-        'Academic Status',
-        'Current standing',
-      ),
-      AcademicItem(
-        Icons.emoji_events_outlined,
-        'Achievements',
-        'Awards & certificates',
-      ),
-      AcademicItem(
-        Icons.science_outlined,
-        'Research',
-        'Publications & projects',
-      ),
-      AcademicItem(
-        Icons.account_balance_wallet_outlined,
-        'Financial Status',
-        'Payments & balances',
-      ),
-      AcademicItem(
-        Icons.groups_outlined,
-        'Student Activities',
-        'Campus participation',
-      ),
-    ];
+              if (day < 1 ||
+                  day > daysInMonth) {
+                return const SizedBox.shrink();
+              }
 
-    return LayoutBuilder(
-      builder: (
-          context,
-          constraints,
-          ) {
-        final width =
-        constraints.maxWidth >= 650
-            ? (constraints.maxWidth - 14) / 2
-            : constraints.maxWidth;
+              final date = DateTime(
+                selectedDate.year,
+                selectedDate.month,
+                day,
+              );
 
-        return Wrap(
-          spacing: 14,
-          runSpacing: 14,
-          children: items.map(
-                (item) {
-              return SizedBox(
-                width: width,
-                child: PremiumHover(
-                  child: InkWell(
-                    borderRadius:
-                    BorderRadius.circular(22),
-                    onTap: () {
-                      _showMessage(
-                        '${item.title} selected.',
-                      );
-                    },
-                    child: Container(
-                      height: 126,
-                      padding:
-                      const EdgeInsets.all(21),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                        BorderRadius.circular(22),
-                        border: Border.all(
-                          color: borderColor,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 49,
-                            height: 49,
-                            alignment:
-                            Alignment.center,
-                            decoration: BoxDecoration(
-                              color: softRed,
-                              borderRadius:
-                              BorderRadius.circular(
-                                15,
-                              ),
-                            ),
-                            child: Icon(
-                              item.icon,
-                              color: iituRed,
-                            ),
-                          ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment:
-                              MainAxisAlignment.center,
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.title,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight:
-                                    FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  item.subtitle,
-                                  style: const TextStyle(
-                                    color: greyText,
-                                    fontSize: 10.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            Icons.north_east,
-                            color: iituRed,
-                            size: 16,
-                          ),
-                        ],
-                      ),
+              final selected =
+                  date.year ==
+                      selectedDate.year &&
+                      date.month ==
+                          selectedDate.month &&
+                      date.day ==
+                          selectedDate.day;
+
+              return InkWell(
+                borderRadius:
+                BorderRadius.circular(50),
+                onTap: () {
+                  onDateSelected(date);
+                },
+                child: Container(
+                  margin: const EdgeInsets.all(3),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.white
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$day',
+                    style: TextStyle(
+                      color: selected
+                          ? iituRed
+                          : Colors.white,
+                      fontSize: 10,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.w400,
                     ),
                   ),
                 ),
               );
             },
-          ).toList(),
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
+}
 
-  // ============================================================
-  // MAX WIDTH
-  // ============================================================
+class CalendarDayLabel extends StatelessWidget {
+  final String text;
 
-  Widget _maxWidth({
-    required Widget child,
-  }) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 1220,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 24,
-          ),
-          child: child,
+  const CalendarDayLabel(
+      this.text, {
+        super.key,
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 8.5,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 }
 
-// ============================================================
-// STUDENT SERVICES FORM PAGE
-// ============================================================
+class InputLikeBox extends StatelessWidget {
+  final IconData icon;
+  final String text;
 
-class StudentServicesPage extends StatefulWidget {
-  final ServiceRequestSummary? lastRequest;
-  final ValueChanged<ServiceRequestSummary>
-  onSubmitted;
-
-  const StudentServicesPage({
+  const InputLikeBox({
     super.key,
-    required this.lastRequest,
-    required this.onSubmitted,
+    required this.icon,
+    required this.text,
   });
 
   @override
-  State<StudentServicesPage> createState() =>
-      _StudentServicesPageState();
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 13,
+        vertical: 15,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: greyText,
+            size: 17,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 10.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _StudentServicesPageState
-    extends State<StudentServicesPage> {
-  // Form key gives access to validate(), save() and reset().
+class PlannerItemCard extends StatelessWidget {
+  final PlannerItem item;
+  final VoidCallback onToggle;
+
+  const PlannerItemCard({
+    super.key,
+    required this.item,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: 10,
+      ),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: item.completed,
+            activeColor: iituRed,
+            onChanged: (_) => onToggle(),
+          ),
+
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    decoration: item.completed
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${item.date.day}/${item.date.month}/${item.date.year} · ${item.time.format(context)}',
+                  style: const TextStyle(
+                    color: greyText,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// SERVICES SCREEN
+// ============================================================
+
+class ServicesScreen extends StatefulWidget {
+  const ServicesScreen({super.key});
+
+  @override
+  State<ServicesScreen> createState() =>
+      _ServicesScreenState();
+}
+
+class _ServicesScreenState
+    extends State<ServicesScreen> {
   final GlobalKey<FormState> _formKey =
   GlobalKey<FormState>();
 
@@ -3558,7 +3334,13 @@ class _StudentServicesPageState
   final TextEditingController _otherController =
   TextEditingController();
 
-  final List<String> _categories = const [
+  String? _category;
+  String? _urgency;
+  String? _contactMethod;
+  DateTime? _preferredDate;
+  bool _declaration = false;
+
+  static const serviceCategories = [
     'Lost Student ID Card',
     'Wi-Fi / Internet',
     'Dormitory Issue',
@@ -3571,37 +3353,38 @@ class _StudentServicesPageState
     'Other',
   ];
 
-  String? _category;
-  String? _urgency;
-  String? _contactMethod;
-  DateTime? _preferredDate;
-
-  bool _declaration = false;
-
-  // Saved values are written only after the complete form is valid.
-  String _savedName = '';
-  String _savedId = '';
-  String _savedEmail = '';
-  String _savedSubject = '';
-  String _savedDetails = '';
-
   @override
   void initState() {
     super.initState();
 
-    // Listeners keep the animated completion progress live.
-    _nameController.addListener(_refreshProgress);
-    _idController.addListener(_refreshProgress);
-    _emailController.addListener(_refreshProgress);
-    _phoneController.addListener(_refreshProgress);
-    _subjectController.addListener(_refreshProgress);
-    _detailsController.addListener(_refreshProgress);
-    _otherController.addListener(_refreshProgress);
+    _nameController.addListener(
+      _refresh,
+    );
+    _idController.addListener(
+      _refresh,
+    );
+    _emailController.addListener(
+      _refresh,
+    );
+    _subjectController.addListener(
+      _refresh,
+    );
+    _detailsController.addListener(
+      _refresh,
+    );
+    _otherController.addListener(
+      _refresh,
+    );
+  }
+
+  void _refresh() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
-    // Required controller cleanup.
     _nameController.dispose();
     _idController.dispose();
     _emailController.dispose();
@@ -3613,21 +3396,18 @@ class _StudentServicesPageState
     super.dispose();
   }
 
-  void _refreshProgress() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  double get _completion {
+  double get _progress {
     int total = 10;
     int completed = 0;
 
-    if (_nameController.text.trim().isNotEmpty) {
+    if (_nameController.text
+        .trim()
+        .isNotEmpty) {
       completed++;
     }
 
-    if (_idController.text.trim().length >= 5) {
+    if (_idController.text.trim().length >=
+        5) {
       completed++;
     }
 
@@ -3679,361 +3459,162 @@ class _StudentServicesPageState
     return completed / total;
   }
 
-  String _dateText(
+  String _formatDate(
       DateTime? date,
       ) {
     if (date == null) {
       return 'Select date';
     }
 
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
+    return '${date.day}/${date.month}/${date.year}';
   }
 
-  Future<void> _selectDate(
+  Future<void> _choosePreferredDate(
       FormFieldState<DateTime> field,
       ) async {
-    final today = DateTime.now();
+    final now = DateTime.now();
 
-    final picked = await showDatePicker(
+    final result = await showDatePicker(
       context: context,
-      initialDate:
-      _preferredDate ?? today,
+      initialDate: _preferredDate ?? now,
       firstDate: DateTime(
-        today.year,
-        today.month,
-        today.day,
+        now.year,
+        now.month,
+        now.day,
       ),
       lastDate: DateTime(
-        today.year + 2,
+        now.year + 2,
       ),
-      helpText:
-      'Select preferred response date',
     );
 
-    if (picked != null) {
+    if (result != null) {
       setState(() {
-        _preferredDate = picked;
+        _preferredDate = result;
       });
 
-      field.didChange(picked);
+      field.didChange(result);
     }
   }
 
-  String _createReference() {
-    final number =
-        DateTime.now().millisecondsSinceEpoch %
-            1000000;
+  Future<void> _openService(
+      CampusService service,
+      ) async {
+    // Requirement: pass selected data to the details route.
+    final result = await safePushNamed(
+      context,
+      AppRoutes.serviceDetail,
+      arguments: service,
+    );
 
-    return 'IITU-SR-${number.toString().padLeft(6, '0')}';
+    if (!mounted) {
+      return;
+    }
+
+    // Requirement: the previous route receives a returned result.
+    if (result == 'requested') {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            '${service.name} request recorded.',
+          ),
+          backgroundColor: successGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  Future<void> _submitForm() async {
-    // Validation happens before save.
+  void _submitForm() {
     final valid =
         _formKey.currentState?.validate() ??
             false;
 
     if (!valid) {
-      ScaffoldMessenger.of(context)
-          .hideCurrentSnackBar();
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Please check the highlighted fields.',
-          ),
-          backgroundColor: iituRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(15),
-          ),
-        ),
-      );
-
       return;
     }
 
-    // save() runs only after all validators pass.
     _formKey.currentState!.save();
 
-    final category = _category == 'Other'
-        ? 'Other: ${_otherController.text.trim()}'
-        : _category!;
-
-    final request =
-    ServiceRequestSummary(
-      reference: _createReference(),
-      studentName: _savedName,
-      studentId: _savedId,
-      email: _savedEmail,
-      category: category,
-      subject: _savedSubject,
-      details: _savedDetails,
-      urgency: _urgency!,
-      contactMethod: _contactMethod!,
-      preferredDate:
-      _dateText(_preferredDate),
-    );
-
-    widget.onSubmitted(request);
-
-    await _showSuccessDialog(request);
-  }
-
-  Future<void> _showSuccessDialog(
-      ServiceRequestSummary request,
-      ) {
-    return showGeneralDialog(
+    showDialog(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Request submitted',
-      barrierColor: Colors.black.withOpacity(
-        0.35,
-      ),
-      transitionDuration:
-      const Duration(milliseconds: 300),
-      pageBuilder: (
-          context,
-          animation,
-          secondaryAnimation,
+      builder: (
+          dialogContext,
           ) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 480,
-              margin: const EdgeInsets.all(20),
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(
-                      0.12,
-                    ),
-                    blurRadius: 40,
-                    offset: const Offset(
-                      0,
-                      20,
-                    ),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(
-                      milliseconds: 450,
-                    ),
-                    curve: Curves.elasticOut,
-                    tween: Tween(
-                      begin: 0.4,
-                      end: 1,
-                    ),
-                    builder: (
-                        context,
-                        value,
-                        child,
-                        ) {
-                      return Transform.scale(
-                        scale: value,
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      width: 70,
-                      height: 70,
-                      decoration:
-                      const BoxDecoration(
-                        color: Color(0xFFEAF7F0),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        color: successGreen,
-                        size: 37,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'Request submitted',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.7,
-                    ),
-                  ),
-
-                  const SizedBox(height: 7),
-
-                  const Text(
-                    'Your request was successfully created.',
-                    style: TextStyle(
-                      color: greyText,
-                      fontSize: 12.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(
-                        0xFFF7F7F9,
-                      ),
-                      borderRadius:
-                      BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        _dialogRow(
-                          'Reference',
-                          request.reference,
-                        ),
-                        _dialogRow(
-                          'Issue',
-                          request.category,
-                        ),
-                        _dialogRow(
-                          'Urgency',
-                          request.urgency,
-                        ),
-                        _dialogRow(
-                          'Contact',
-                          request.contactMethod,
-                        ),
-                        _dialogRow(
-                          'Preferred date',
-                          request.preferredDate,
-                          last: true,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 23),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style:
-                      ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: iituRed,
-                        foregroundColor:
-                        Colors.white,
-                        padding:
-                        const EdgeInsets.symmetric(
-                          vertical: 15,
-                        ),
-                      ),
-                      child: const Text(
-                        'Done',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(27),
           ),
+          title: const Column(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor:
+                Color(0xFFEAF7F0),
+                child: Icon(
+                  Icons.check_rounded,
+                  color: successGreen,
+                  size: 32,
+                ),
+              ),
+              SizedBox(height: 14),
+              Text(
+                'Request submitted',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              SummaryLine(
+                label: 'Issue',
+                value:
+                _category ?? '-',
+              ),
+              SummaryLine(
+                label: 'Urgency',
+                value:
+                _urgency ?? '-',
+              ),
+              SummaryLine(
+                label: 'Contact',
+                value:
+                _contactMethod ?? '-',
+              ),
+              SummaryLine(
+                label: 'Preferred date',
+                value:
+                _formatDate(
+                  _preferredDate,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                );
+              },
+              child: const Text('Done'),
+            ),
+          ],
         );
       },
-      transitionBuilder: (
-          context,
-          animation,
-          secondaryAnimation,
-          child,
-          ) {
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(
-              begin: 0.94,
-              end: 1,
-            ).animate(
-              CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              ),
-            ),
-            child: child,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _dialogRow(
-      String label,
-      String value, {
-        bool last = false,
-      }) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: last ? 0 : 13,
-      ),
-      child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 115,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: greyText,
-                fontSize: 10.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
   void _resetForm() {
-    // reset() clears FormField validation states.
     _formKey.currentState?.reset();
 
-    // Controllers and non-Form state are reset as well.
     _nameController.text =
     'Akvarzhanova Irada';
     _idController.text = '41151';
@@ -4052,1187 +3633,1055 @@ class _StudentServicesPageState
       _preferredDate = null;
       _declaration = false;
     });
+  }
 
-    ScaffoldMessenger.of(context)
-        .hideCurrentSnackBar();
+  @override
+  Widget build(BuildContext context) {
+    final progress =
+    (_progress * 100).round();
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: const Text(
-          'The request form has been reset.',
+    return CampusScaffold(
+      currentRoute: AppRoutes.services,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          24,
+          55,
+          24,
+          90,
         ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: darkText,
-        shape: RoundedRectangleBorder(
-          borderRadius:
-          BorderRadius.circular(15),
+        child: MaxWidth(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              const SectionHeading(
+                eyebrow: 'CAMPUS SERVICES',
+                title: 'Support across IITU.',
+                subtitle:
+                'Choose a university service to view details or submit a student service request.',
+              ),
+
+              const SizedBox(height: 30),
+
+              LayoutBuilder(
+                builder: (
+                    context,
+                    constraints,
+                    ) {
+                  double width;
+
+                  if (constraints.maxWidth >=
+                      900) {
+                    width =
+                        (constraints.maxWidth -
+                            28) /
+                            3;
+                  } else if (constraints
+                      .maxWidth >=
+                      600) {
+                    width =
+                        (constraints.maxWidth -
+                            14) /
+                            2;
+                  } else {
+                    width =
+                        constraints.maxWidth;
+                  }
+
+                  return Wrap(
+                    spacing: 14,
+                    runSpacing: 14,
+                    children:
+                    campusServices.map(
+                          (service) {
+                        return SizedBox(
+                          width: width,
+                          child:
+                          ServiceCard(
+                            service:
+                            service,
+                            onTap: () {
+                              _openService(
+                                service,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ).toList(),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 85),
+
+              const SectionHeading(
+                eyebrow: 'SERVICE REQUEST',
+                title: 'How can we help?',
+                subtitle:
+                'Submit a request and the appropriate IITU team can review your information.',
+              ),
+
+              const SizedBox(height: 28),
+
+              Form(
+                key: _formKey,
+                autovalidateMode:
+                AutovalidateMode
+                    .onUserInteraction,
+                child: Column(
+                  children: [
+                    Container(
+                      padding:
+                      const EdgeInsets.all(
+                        21,
+                      ),
+                      decoration:
+                      BoxDecoration(
+                        color: Colors.white,
+                        borderRadius:
+                        BorderRadius.circular(
+                          23,
+                        ),
+                        border: Border.all(
+                          color: borderColor,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Request completion',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight:
+                                  FontWeight
+                                      .w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '$progress%',
+                                style:
+                                const TextStyle(
+                                  color: iituRed,
+                                  fontSize: 11,
+                                  fontWeight:
+                                  FontWeight
+                                      .w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TweenAnimationBuilder<
+                              double>(
+                            duration:
+                            const Duration(
+                              milliseconds: 320,
+                            ),
+                            tween: Tween(
+                              begin: 0,
+                              end: _progress,
+                            ),
+                            builder: (
+                                context,
+                                value,
+                                child,
+                                ) {
+                              return ClipRRect(
+                                borderRadius:
+                                BorderRadius
+                                    .circular(
+                                  20,
+                                ),
+                                child:
+                                LinearProgressIndicator(
+                                  value: value,
+                                  minHeight: 7,
+                                  color: iituRed,
+                                  backgroundColor:
+                                  softGrey,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    FormSection(
+                      number: '01',
+                      title:
+                      'Student details',
+                      child:
+                      _studentFields(),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    FormSection(
+                      number: '02',
+                      title:
+                      'Request details',
+                      child:
+                      _requestFields(),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    FormSection(
+                      number: '03',
+                      title:
+                      'Preferences',
+                      child:
+                      _preferenceFields(),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    FormSection(
+                      number: '04',
+                      title:
+                      'Confirmation',
+                      child: Column(
+                        children: [
+                          FormField<bool>(
+                            initialValue:
+                            false,
+                            validator:
+                                (value) {
+                              if (value !=
+                                  true) {
+                                return 'Please confirm the information.';
+                              }
+
+                              return null;
+                            },
+                            builder:
+                                (field) {
+                              return Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+                                children: [
+                                  CheckboxListTile(
+                                    value:
+                                    _declaration,
+                                    activeColor:
+                                    iituRed,
+                                    contentPadding:
+                                    EdgeInsets
+                                        .zero,
+                                    controlAffinity:
+                                    ListTileControlAffinity
+                                        .leading,
+                                    title:
+                                    const Text(
+                                      'I confirm that the information above is correct.',
+                                      style:
+                                      TextStyle(
+                                        fontSize:
+                                        12,
+                                        fontWeight:
+                                        FontWeight
+                                            .w500,
+                                      ),
+                                    ),
+                                    onChanged:
+                                        (value) {
+                                      final selected =
+                                          value ??
+                                              false;
+
+                                      setState(
+                                              () {
+                                            _declaration =
+                                                selected;
+                                          });
+
+                                      field
+                                          .didChange(
+                                        selected,
+                                      );
+                                    },
+                                  ),
+
+                                  if (field
+                                      .hasError)
+                                    Text(
+                                      field
+                                          .errorText!,
+                                      style:
+                                      const TextStyle(
+                                        color:
+                                        iituRed,
+                                        fontSize:
+                                        10.5,
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed:
+                          _submitForm,
+                          style:
+                          ElevatedButton
+                              .styleFrom(
+                            elevation: 0,
+                            backgroundColor:
+                            iituRed,
+                            foregroundColor:
+                            Colors.white,
+                            padding:
+                            const EdgeInsets
+                                .symmetric(
+                              horizontal: 22,
+                              vertical: 16,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.send_rounded,
+                            size: 17,
+                          ),
+                          label: const Text(
+                            'Submit Request',
+                          ),
+                        ),
+
+                        const SizedBox(
+                          width: 11,
+                        ),
+
+                        OutlinedButton.icon(
+                          onPressed:
+                          _resetForm,
+                          style:
+                          OutlinedButton
+                              .styleFrom(
+                            foregroundColor:
+                            darkText,
+                            padding:
+                            const EdgeInsets
+                                .symmetric(
+                              horizontal: 22,
+                              vertical: 16,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons
+                                .refresh_rounded,
+                            size: 17,
+                          ),
+                          label: const Text(
+                            'Reset',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final percent =
-    (_completion * 100).round();
+  Widget _studentFields() {
+    return LayoutBuilder(
+      builder: (
+          context,
+          constraints,
+          ) {
+        final desktop =
+            constraints.maxWidth >= 700;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        24,
-        58,
-        24,
-        100,
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 1050,
+        final width = desktop
+            ? (constraints.maxWidth - 14) / 2
+            : constraints.maxWidth;
+
+        return Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            SizedBox(
+              width: width,
+              child: TextFormField(
+                controller: _nameController,
+                textInputAction:
+                TextInputAction.next,
+                decoration:
+                const InputDecoration(
+                  labelText: 'Full name',
+                  prefixIcon: Icon(
+                    Icons.person_outline,
+                  ),
+                ),
+                validator: (value) {
+                  final text =
+                      value?.trim() ?? '';
+
+                  if (text.isEmpty) {
+                    return 'Please enter your full name.';
+                  }
+
+                  if (!text.contains(' ')) {
+                    return 'Please enter at least two names.';
+                  }
+
+                  return null;
+                },
+              ),
+            ),
+
+            SizedBox(
+              width: width,
+              child: TextFormField(
+                controller: _idController,
+                textInputAction:
+                TextInputAction.next,
+                decoration:
+                const InputDecoration(
+                  labelText: 'Student ID',
+                  prefixIcon: Icon(
+                    Icons.badge_outlined,
+                  ),
+                ),
+                validator: (value) {
+                  if ((value?.trim().length ??
+                      0) <
+                      5) {
+                    return 'Student ID must have at least 5 characters.';
+                  }
+
+                  return null;
+                },
+              ),
+            ),
+
+            SizedBox(
+              width: width,
+              child: TextFormField(
+                controller:
+                _emailController,
+                keyboardType:
+                TextInputType
+                    .emailAddress,
+                textInputAction:
+                TextInputAction.next,
+                decoration:
+                const InputDecoration(
+                  labelText:
+                  'Campus email',
+                  prefixIcon: Icon(
+                    Icons.email_outlined,
+                  ),
+                ),
+                validator: (value) {
+                  final email =
+                      value?.trim() ?? '';
+
+                  if (!email.contains('@') ||
+                      !email.contains('.')) {
+                    return 'Enter a valid email address.';
+                  }
+
+                  return null;
+                },
+              ),
+            ),
+
+            SizedBox(
+              width: width,
+              child: TextFormField(
+                controller:
+                _phoneController,
+                keyboardType:
+                TextInputType.phone,
+                decoration:
+                const InputDecoration(
+                  labelText:
+                  'Phone number',
+                  prefixIcon: Icon(
+                    Icons.phone_outlined,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _requestFields() {
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          value: _category,
+          isExpanded: true,
+          decoration:
+          const InputDecoration(
+            labelText:
+            'Service category',
+            prefixIcon: Icon(
+              Icons
+                  .support_agent_outlined,
+            ),
           ),
-          child: Form(
-            key: _formKey,
+          items: serviceCategories
+              .map(
+                (item) =>
+                DropdownMenuItem(
+                  value: item,
+                  child: Text(item),
+                ),
+          )
+              .toList(),
+          onChanged: (value) {
+            setState(() {
+              _category = value;
 
-            // Errors appear after the user interacts with a field.
-            autovalidateMode:
-            AutovalidateMode
-                .onUserInteraction,
+              if (value != 'Other') {
+                _otherController.clear();
+              }
+            });
+          },
+          validator: (value) {
+            if (value == null) {
+              return 'Please select a category.';
+            }
 
-            child: Column(
+            return null;
+          },
+        ),
+
+        AnimatedSwitcher(
+          duration:
+          const Duration(milliseconds: 250),
+          child: _category == 'Other'
+              ? Padding(
+            key: const ValueKey(
+              'other',
+            ),
+            padding:
+            const EdgeInsets.only(
+              top: 14,
+            ),
+            child: TextFormField(
+              controller:
+              _otherController,
+              maxLength: 180,
+              maxLines: 3,
+              decoration:
+              const InputDecoration(
+                labelText:
+                'Describe the other issue',
+              ),
+              validator: (value) {
+                if (_category !=
+                    'Other') {
+                  return null;
+                }
+
+                if ((value
+                    ?.trim()
+                    .length ??
+                    0) <
+                    10) {
+                  return 'Please describe the issue.';
+                }
+
+                return null;
+              },
+            ),
+          )
+              : const SizedBox.shrink(
+            key: ValueKey(
+              'no-other',
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        TextFormField(
+          controller:
+          _subjectController,
+          decoration:
+          const InputDecoration(
+            labelText:
+            'Request subject',
+            prefixIcon: Icon(
+              Icons.short_text,
+            ),
+          ),
+          validator: (value) {
+            if ((value?.trim().length ??
+                0) <
+                5) {
+              return 'Use at least 5 characters.';
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        TextFormField(
+          controller:
+          _detailsController,
+          maxLines: 5,
+          maxLength: 300,
+          decoration:
+          const InputDecoration(
+            labelText:
+            'Request details',
+            alignLabelWithHint: true,
+          ),
+          validator: (value) {
+            if ((value?.trim().length ??
+                0) <
+                20) {
+              return 'Please provide at least 20 characters.';
+            }
+
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _preferenceFields() {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Urgency',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: [
+            ChoicePill(
+              label: 'Normal',
+              selected:
+              _urgency == 'Normal',
+              onTap: () {
+                setState(() {
+                  _urgency = 'Normal';
+                });
+              },
+            ),
+            ChoicePill(
+              label: 'Soon',
+              selected:
+              _urgency == 'Soon',
+              onTap: () {
+                setState(() {
+                  _urgency = 'Soon';
+                });
+              },
+            ),
+            ChoicePill(
+              label: 'Urgent',
+              selected:
+              _urgency == 'Urgent',
+              onTap: () {
+                setState(() {
+                  _urgency = 'Urgent';
+                });
+              },
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 22),
+
+        const Text(
+          'Preferred contact',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: [
+            ChoicePill(
+              label: 'Email',
+              selected:
+              _contactMethod ==
+                  'Email',
+              onTap: () {
+                setState(() {
+                  _contactMethod =
+                  'Email';
+                });
+              },
+            ),
+            ChoicePill(
+              label: 'Phone',
+              selected:
+              _contactMethod ==
+                  'Phone',
+              onTap: () {
+                setState(() {
+                  _contactMethod =
+                  'Phone';
+                });
+              },
+            ),
+            ChoicePill(
+              label:
+              'Campus meeting',
+              selected:
+              _contactMethod ==
+                  'Campus meeting',
+              onTap: () {
+                setState(() {
+                  _contactMethod =
+                  'Campus meeting';
+                });
+              },
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 22),
+
+        FormField<String>(
+          validator: (_) {
+            if (_urgency == null) {
+              return 'Please select urgency.';
+            }
+
+            if (_contactMethod == null) {
+              return 'Please select a contact method.';
+            }
+
+            return null;
+          },
+          builder: (field) {
+            return Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                const PremiumHeading(
-                  eyebrow: 'STUDENT SERVICES',
-                  title: 'How can we help?',
-                  subtitle:
-                  'Submit a campus service request and the appropriate IITU team can review your information.',
-                ),
-
-                const SizedBox(height: 32),
-
-                // Advanced customization: animated completion progress.
-                Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius:
-                    BorderRadius.circular(24),
-                    border: Border.all(
-                      color: borderColor,
+                if (field.hasError)
+                  Padding(
+                    padding:
+                    const EdgeInsets.only(
+                      bottom: 12,
+                    ),
+                    child: Text(
+                      field.errorText!,
+                      style:
+                      const TextStyle(
+                        color: iituRed,
+                        fontSize: 10.5,
+                      ),
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'Request completion',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight:
-                              FontWeight.w600,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '$percent%',
-                            style: const TextStyle(
-                              color: iituRed,
-                              fontSize: 12,
-                              fontWeight:
-                              FontWeight.w600,
-                            ),
-                          ),
-                        ],
+              ],
+            );
+          },
+        ),
+
+        FormField<DateTime>(
+          validator: (value) {
+            if (_preferredDate == null) {
+              return 'Please choose a preferred response date.';
+            }
+
+            return null;
+          },
+          builder: (field) {
+            return Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  borderRadius:
+                  BorderRadius.circular(
+                    17,
+                  ),
+                  onTap: () {
+                    _choosePreferredDate(
+                      field,
+                    );
+                  },
+                  child: InputLikeBox(
+                    icon: Icons
+                        .calendar_month_outlined,
+                    text: _formatDate(
+                      _preferredDate,
+                    ),
+                  ),
+                ),
+
+                if (field.hasError)
+                  Padding(
+                    padding:
+                    const EdgeInsets.only(
+                      top: 8,
+                    ),
+                    child: Text(
+                      field.errorText!,
+                      style:
+                      const TextStyle(
+                        color: iituRed,
+                        fontSize: 10.5,
                       ),
-                      const SizedBox(height: 13),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(
-                          begin: 0,
-                          end: _completion,
-                        ),
-                        duration: const Duration(
-                          milliseconds: 350,
-                        ),
-                        curve: Curves.easeOutCubic,
-                        builder: (
-                            context,
-                            value,
-                            child,
-                            ) {
-                          return ClipRRect(
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// SERVICE DETAILS
+// ============================================================
+
+class ServiceDetailScreen
+    extends StatelessWidget {
+  final CampusService service;
+
+  const ServiceDetailScreen({
+    super.key,
+    required this.service,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: pageBackground,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: Text(
+          service.name,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            24,
+            55,
+            24,
+            80,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints:
+              const BoxConstraints(
+                maxWidth: 850,
+              ),
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding:
+                    const EdgeInsets.all(
+                      30,
+                    ),
+                    decoration:
+                    BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                      BorderRadius.circular(
+                        30,
+                      ),
+                      border: Border.all(
+                        color: borderColor,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 65,
+                          height: 65,
+                          alignment:
+                          Alignment.center,
+                          decoration:
+                          BoxDecoration(
+                            color: service.color.withOpacity(0.12),
                             borderRadius:
                             BorderRadius.circular(
                               20,
                             ),
-                            child:
-                            LinearProgressIndicator(
-                              value: value,
-                              minHeight: 7,
-                              backgroundColor:
-                              softGrey,
-                              color: iituRed,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                FormSectionCard(
-                  number: '01',
-                  title: 'Student details',
-                  subtitle:
-                  'Tell us who is submitting the request.',
-                  child: LayoutBuilder(
-                    builder: (
-                        context,
-                        constraints,
-                        ) {
-                      final desktop =
-                          constraints.maxWidth >=
-                              700;
-
-                      final width = desktop
-                          ? (constraints.maxWidth -
-                          16) /
-                          2
-                          : constraints.maxWidth;
-
-                      return Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          SizedBox(
-                            width: width,
-                            child: TextFormField(
-                              controller:
-                              _nameController,
-                              textInputAction:
-                              TextInputAction.next,
-                              decoration:
-                              const InputDecoration(
-                                labelText:
-                                'Full name',
-                                hintText:
-                                'First and last name',
-                                prefixIcon: Icon(
-                                  Icons
-                                      .person_outline,
-                                ),
-                              ),
-                              validator: (value) {
-                                final text =
-                                    value?.trim() ??
-                                        '';
-
-                                if (text.isEmpty) {
-                                  return 'Please enter your full name.';
-                                }
-
-                                if (!text.contains(
-                                  ' ',
-                                )) {
-                                  return 'Please enter at least two names.';
-                                }
-
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _savedName =
-                                    value!.trim();
-                              },
-                            ),
                           ),
-
-                          SizedBox(
-                            width: width,
-                            child: TextFormField(
-                              controller:
-                              _idController,
-                              textInputAction:
-                              TextInputAction.next,
-                              decoration:
-                              const InputDecoration(
-                                labelText:
-                                'Student ID',
-                                hintText: '41151',
-                                prefixIcon: Icon(
-                                  Icons
-                                      .badge_outlined,
-                                ),
-                              ),
-                              validator: (value) {
-                                final text =
-                                    value?.trim() ??
-                                        '';
-
-                                if (text.isEmpty) {
-                                  return 'Please enter your Student ID.';
-                                }
-
-                                if (text.length < 5) {
-                                  return 'Student ID must contain at least 5 characters.';
-                                }
-
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _savedId =
-                                    value!.trim();
-                              },
-                            ),
-                          ),
-
-                          SizedBox(
-                            width: width,
-                            child: TextFormField(
-                              controller:
-                              _emailController,
-                              keyboardType:
-                              TextInputType
-                                  .emailAddress,
-                              textInputAction:
-                              TextInputAction.next,
-                              decoration:
-                              const InputDecoration(
-                                labelText:
-                                'Campus email',
-                                hintText:
-                                'name@student.iitu.kz',
-                                prefixIcon: Icon(
-                                  Icons
-                                      .email_outlined,
-                                ),
-                              ),
-                              validator: (value) {
-                                final email =
-                                    value?.trim() ??
-                                        '';
-
-                                final emailRegex =
-                                RegExp(
-                                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                                );
-
-                                if (email.isEmpty) {
-                                  return 'Please enter your campus email.';
-                                }
-
-                                if (!emailRegex
-                                    .hasMatch(
-                                  email,
-                                )) {
-                                  return 'Enter a valid email address.';
-                                }
-
-                                if (!email.endsWith(
-                                  '@student.iitu.kz',
-                                )) {
-                                  return 'Use your @student.iitu.kz email.';
-                                }
-
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _savedEmail =
-                                    value!.trim();
-                              },
-                            ),
-                          ),
-
-                          SizedBox(
-                            width: width,
-                            child: TextFormField(
-                              controller:
-                              _phoneController,
-                              keyboardType:
-                              TextInputType.phone,
-                              textInputAction:
-                              TextInputAction.next,
-                              decoration:
-                              const InputDecoration(
-                                labelText:
-                                'Phone number',
-                                hintText:
-                                '+7 700 000 00 00',
-                                prefixIcon: Icon(
-                                  Icons
-                                      .phone_outlined,
-                                ),
-                              ),
-                              validator: (value) {
-                                final phone =
-                                    value?.trim() ??
-                                        '';
-
-                                if (phone.isEmpty) {
-                                  return null;
-                                }
-
-                                final phoneRegex =
-                                RegExp(
-                                  r'^\+?[0-9\s\-]{7,18}$',
-                                );
-
-                                if (!phoneRegex
-                                    .hasMatch(
-                                  phone,
-                                )) {
-                                  return 'Enter a valid phone number.';
-                                }
-
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                FormSectionCard(
-                  number: '02',
-                  title: 'What do you need help with?',
-                  subtitle:
-                  'Choose the campus service that best matches your issue.',
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: _category,
-                        isExpanded: true,
-                        decoration:
-                        const InputDecoration(
-                          labelText:
-                          'Service category',
-                          prefixIcon: Icon(
-                            Icons
-                                .support_agent_outlined,
+                          child: Icon(
+                            service.icon,
+                            color: service.color,
+                            size: 30,
                           ),
                         ),
-                        hint: const Text(
-                          'Select a problem',
+
+                        const SizedBox(height: 22),
+
+                        Text(
+                          service.name,
+                          style: const TextStyle(
+                            fontSize: 31,
+                            fontWeight:
+                            FontWeight.w600,
+                            letterSpacing: -1,
+                          ),
                         ),
-                        items: _categories
-                            .map(
-                              (
-                              category,
-                              ) =>
-                              DropdownMenuItem<
-                                  String>(
-                                value: category,
-                                child: Text(
-                                  category,
-                                ),
-                              ),
-                        )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _category = value;
 
-                            if (value !=
-                                'Other') {
-                              _otherController
-                                  .clear();
-                            }
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Please select a service category.';
-                          }
+                        const SizedBox(height: 10),
 
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          IssueQuickChip(
-                            label:
-                            'Wi-Fi / Internet',
-                            selected:
-                            _category ==
-                                'Wi-Fi / Internet',
-                            onTap: () {
-                              setState(() {
-                                _category =
-                                'Wi-Fi / Internet';
-                                _otherController
-                                    .clear();
-                              });
-                            },
+                        Text(
+                          service.description,
+                          style:
+                          const TextStyle(
+                            color: greyText,
+                            fontSize: 13,
+                            height: 1.65,
                           ),
-                          IssueQuickChip(
-                            label:
-                            'Lost Student ID Card',
-                            selected:
-                            _category ==
-                                'Lost Student ID Card',
-                            onTap: () {
-                              setState(() {
-                                _category =
-                                'Lost Student ID Card';
-                                _otherController
-                                    .clear();
-                              });
-                            },
-                          ),
-                          IssueQuickChip(
-                            label:
-                            'Academic Documents',
-                            selected:
-                            _category ==
-                                'Academic Documents',
-                            onTap: () {
-                              setState(() {
-                                _category =
-                                'Academic Documents';
-                                _otherController
-                                    .clear();
-                              });
-                            },
-                          ),
-                          IssueQuickChip(
-                            label: 'Other',
-                            selected:
-                            _category ==
-                                'Other',
-                            onTap: () {
-                              setState(() {
-                                _category =
-                                'Other';
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-
-                      // Advanced customization:
-                      // the extra field appears only for "Other".
-                      AnimatedSwitcher(
-                        duration: const Duration(
-                          milliseconds: 260,
                         ),
-                        transitionBuilder: (
-                            child,
-                            animation,
-                            ) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child:
-                            SizeTransition(
-                              sizeFactor:
-                              animation,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: _category == 'Other'
-                            ? Padding(
-                          key: const ValueKey(
-                            'other-field',
-                          ),
-                          padding:
-                          const EdgeInsets
-                              .only(
-                            top: 18,
-                          ),
+
+                        const SizedBox(height: 30),
+
+                        DetailInformationRow(
+                          icon: Icons
+                              .location_on_outlined,
+                          label: 'Location',
+                          value:
+                          service.location,
+                        ),
+
+                        DetailInformationRow(
+                          icon:
+                          Icons.access_time,
+                          label:
+                          'Opening hours',
+                          value: service
+                              .openingHours,
+                        ),
+
+                        DetailInformationRow(
+                          icon:
+                          Icons.email_outlined,
+                          label: 'Contact',
+                          value:
+                          service.contact,
+                        ),
+
+                        DetailInformationRow(
+                          icon: Icons
+                              .check_circle_outline,
+                          label: 'Status',
+                          value:
+                          service.status,
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        SizedBox(
+                          width: double.infinity,
                           child:
-                          TextFormField(
-                            controller:
-                            _otherController,
-                            maxLength: 180,
-                            maxLines: 3,
-                            decoration:
-                            const InputDecoration(
-                              labelText:
-                              'Tell us what happened',
-                              hintText:
-                              'Describe the issue that is not listed above...',
-                              alignLabelWithHint:
-                              true,
-                            ),
-                            validator:
-                                (value) {
-                              if (_category !=
-                                  'Other') {
-                                return null;
-                              }
-
-                              final text =
-                                  value?.trim() ??
-                                      '';
-
-                              if (text.length <
-                                  10) {
-                                return 'Please describe the issue in at least 10 characters.';
-                              }
-
-                              return null;
-                            },
-                          ),
-                        )
-                            : const SizedBox
-                            .shrink(
-                          key: ValueKey(
-                            'no-other-field',
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      TextFormField(
-                        controller:
-                        _subjectController,
-                        textInputAction:
-                        TextInputAction.next,
-                        decoration:
-                        const InputDecoration(
-                          labelText:
-                          'Request subject',
-                          hintText:
-                          'Briefly describe your request',
-                          prefixIcon: Icon(
-                            Icons
-                                .short_text_rounded,
-                          ),
-                        ),
-                        validator: (value) {
-                          final text =
-                              value?.trim() ??
-                                  '';
-
-                          if (text.isEmpty) {
-                            return 'Please enter a request subject.';
-                          }
-
-                          if (text.length < 5) {
-                            return 'Use at least 5 characters.';
-                          }
-
-                          return null;
-                        },
-                        onSaved: (value) {
-                          _savedSubject =
-                              value!.trim();
-                        },
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      // Advanced customization:
-                      // live 0/300 counter and maximum length.
-                      TextFormField(
-                        controller:
-                        _detailsController,
-                        maxLines: 6,
-                        maxLength: 300,
-                        keyboardType:
-                        TextInputType.multiline,
-                        textInputAction:
-                        TextInputAction.newline,
-                        decoration:
-                        const InputDecoration(
-                          labelText:
-                          'Request details',
-                          hintText:
-                          'Explain what happened and what kind of help you need...',
-                          alignLabelWithHint: true,
-                          prefixIcon: Padding(
-                            padding:
-                            EdgeInsets.only(
-                              bottom: 92,
-                            ),
-                            child: Icon(
-                              Icons
-                                  .description_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: (value) {
-                          final text =
-                              value?.trim() ??
-                                  '';
-
-                          if (text.isEmpty) {
-                            return 'Please describe your request.';
-                          }
-
-                          if (text.length < 20) {
-                            return 'Please provide at least 20 characters.';
-                          }
-
-                          return null;
-                        },
-                        onSaved: (value) {
-                          _savedDetails =
-                              value!.trim();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                FormSectionCard(
-                  number: '03',
-                  title: 'Request preferences',
-                  subtitle:
-                  'Tell us how urgent the request is and how you prefer to be contacted.',
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      const FormMiniTitle(
-                        title: 'Urgency',
-                        subtitle:
-                        'Choose one level.',
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      FormField<String>(
-                        initialValue: _urgency,
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Please select an urgency level.';
-                          }
-
-                          return null;
-                        },
-                        onSaved: (value) {
-                          _urgency = value;
-                        },
-                        builder: (field) {
-                          return Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: [
-                                  SelectionChip(
-                                    label:
-                                    'Normal',
-                                    icon: Icons
-                                        .schedule_outlined,
-                                    selected:
-                                    _urgency ==
-                                        'Normal',
-                                    onTap: () {
-                                      setState(() {
-                                        _urgency =
-                                        'Normal';
-                                      });
-
-                                      field.didChange(
-                                        'Normal',
-                                      );
-                                    },
-                                  ),
-                                  SelectionChip(
-                                    label: 'Soon',
-                                    icon: Icons
-                                        .update_rounded,
-                                    selected:
-                                    _urgency ==
-                                        'Soon',
-                                    onTap: () {
-                                      setState(() {
-                                        _urgency =
-                                        'Soon';
-                                      });
-
-                                      field.didChange(
-                                        'Soon',
-                                      );
-                                    },
-                                  ),
-                                  SelectionChip(
-                                    label:
-                                    'Urgent',
-                                    icon: Icons
-                                        .priority_high_rounded,
-                                    selected:
-                                    _urgency ==
-                                        'Urgent',
-                                    onTap: () {
-                                      setState(() {
-                                        _urgency =
-                                        'Urgent';
-                                      });
-
-                                      field.didChange(
-                                        'Urgent',
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-
-                              if (field.hasError)
-                                Padding(
-                                  padding:
-                                  const EdgeInsets
-                                      .only(
-                                    top: 8,
-                                    left: 12,
-                                  ),
-                                  child: Text(
-                                    field.errorText!,
-                                    style:
-                                    const TextStyle(
-                                      color: iituRed,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 25),
-
-                      const Divider(),
-
-                      const SizedBox(height: 22),
-
-                      const FormMiniTitle(
-                        title:
-                        'Preferred contact',
-                        subtitle:
-                        'How should the university contact you?',
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      FormField<String>(
-                        initialValue:
-                        _contactMethod,
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Please select a contact method.';
-                          }
-
-                          return null;
-                        },
-                        onSaved: (value) {
-                          _contactMethod = value;
-                        },
-                        builder: (field) {
-                          return Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: [
-                                  SelectionChip(
-                                    label: 'Email',
-                                    icon: Icons
-                                        .email_outlined,
-                                    selected:
-                                    _contactMethod ==
-                                        'Email',
-                                    onTap: () {
-                                      setState(() {
-                                        _contactMethod =
-                                        'Email';
-                                      });
-
-                                      field.didChange(
-                                        'Email',
-                                      );
-                                    },
-                                  ),
-                                  SelectionChip(
-                                    label: 'Phone',
-                                    icon: Icons
-                                        .phone_outlined,
-                                    selected:
-                                    _contactMethod ==
-                                        'Phone',
-                                    onTap: () {
-                                      setState(() {
-                                        _contactMethod =
-                                        'Phone';
-                                      });
-
-                                      field.didChange(
-                                        'Phone',
-                                      );
-                                    },
-                                  ),
-                                  SelectionChip(
-                                    label:
-                                    'Campus meeting',
-                                    icon: Icons
-                                        .groups_outlined,
-                                    selected:
-                                    _contactMethod ==
-                                        'Campus meeting',
-                                    onTap: () {
-                                      setState(() {
-                                        _contactMethod =
-                                        'Campus meeting';
-                                      });
-
-                                      field.didChange(
-                                        'Campus meeting',
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-
-                              if (field.hasError)
-                                Padding(
-                                  padding:
-                                  const EdgeInsets
-                                      .only(
-                                    top: 8,
-                                    left: 12,
-                                  ),
-                                  child: Text(
-                                    field.errorText!,
-                                    style:
-                                    const TextStyle(
-                                      color: iituRed,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 25),
-
-                      const Divider(),
-
-                      const SizedBox(height: 22),
-
-                      const FormMiniTitle(
-                        title:
-                        'Preferred response date',
-                        subtitle:
-                        'Choose a date that is not in the past.',
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      FormField<DateTime>(
-                        initialValue:
-                        _preferredDate,
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Please select a preferred response date.';
-                          }
-
-                          final today =
-                          DateTime.now();
-
-                          final startToday =
-                          DateTime(
-                            today.year,
-                            today.month,
-                            today.day,
-                          );
-
-                          final selected =
-                          DateTime(
-                            value.year,
-                            value.month,
-                            value.day,
-                          );
-
-                          if (selected.isBefore(
-                            startToday,
-                          )) {
-                            return 'The response date cannot be in the past.';
-                          }
-
-                          return null;
-                        },
-                        onSaved: (value) {
-                          _preferredDate =
-                              value;
-                        },
-                        builder: (field) {
-                          return Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              InkWell(
-                                borderRadius:
-                                BorderRadius
-                                    .circular(
-                                  17,
-                                ),
-                                onTap: () {
-                                  _selectDate(
-                                    field,
-                                  );
-                                },
-                                child: Container(
-                                  width:
-                                  double.infinity,
-                                  padding:
-                                  const EdgeInsets
-                                      .symmetric(
-                                    horizontal: 18,
-                                    vertical: 17,
-                                  ),
-                                  decoration:
-                                  BoxDecoration(
-                                    color:
-                                    const Color(
-                                      0xFFF5F5F7,
-                                    ),
-                                    borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                      17,
-                                    ),
-                                    border:
-                                    Border.all(
-                                      color:
-                                      field.hasError
-                                          ? iituRed
-                                          : borderColor,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons
-                                            .calendar_month_outlined,
-                                        color:
-                                        greyText,
-                                      ),
-                                      const SizedBox(
-                                        width: 12,
-                                      ),
-                                      Expanded(
-                                        child: Text(
-                                          _dateText(
-                                            _preferredDate,
-                                          ),
-                                          style:
-                                          TextStyle(
-                                            color:
-                                            _preferredDate ==
-                                                null
-                                                ? greyText
-                                                : darkText,
-                                            fontSize:
-                                            13,
-                                          ),
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons
-                                            .keyboard_arrow_down_rounded,
-                                        color:
-                                        greyText,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              if (field.hasError)
-                                Padding(
-                                  padding:
-                                  const EdgeInsets
-                                      .only(
-                                    top: 8,
-                                    left: 12,
-                                  ),
-                                  child: Text(
-                                    field.errorText!,
-                                    style:
-                                    const TextStyle(
-                                      color: iituRed,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                FormSectionCard(
-                  number: '04',
-                  title: 'Confirmation',
-                  subtitle:
-                  'Check your information before submitting the request.',
-                  child: FormField<bool>(
-                    initialValue: false,
-                    validator: (value) {
-                      if (value != true) {
-                        return 'Please confirm the information before submitting.';
-                      }
-
-                      return null;
-                    },
-                    builder: (field) {
-                      return Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          CheckboxListTile(
-                            value: _declaration,
-                            contentPadding:
-                            EdgeInsets.zero,
-                            controlAffinity:
-                            ListTileControlAffinity
-                                .leading,
-                            activeColor: iituRed,
-                            title: const Text(
-                              'I confirm that the information above is correct.',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight:
-                                FontWeight.w500,
-                              ),
-                            ),
-                            subtitle: const Text(
-                              'The information will be used only to process this campus service request.',
-                              style: TextStyle(
-                                color: greyText,
-                                fontSize: 10.5,
-                              ),
-                            ),
-                            onChanged: (value) {
-                              final selected =
-                                  value ?? false;
-
-                              setState(() {
-                                _declaration =
-                                    selected;
-                              });
-
-                              field.didChange(
-                                selected,
+                          ElevatedButton.icon(
+                            // Requirement:
+                            // pop() returns a result
+                            // to the previous Services route.
+                            onPressed: () {
+                              Navigator.pop(
+                                context,
+                                'requested',
                               );
                             },
-                          ),
-
-                          if (field.hasError)
-                            Padding(
+                            style:
+                            ElevatedButton
+                                .styleFrom(
+                              elevation: 0,
+                              backgroundColor:
+                              iituRed,
+                              foregroundColor:
+                              Colors.white,
                               padding:
                               const EdgeInsets
-                                  .only(
-                                left: 12,
-                                top: 4,
-                              ),
-                              child: Text(
-                                field.errorText!,
-                                style:
-                                const TextStyle(
-                                  color: iituRed,
-                                  fontSize: 11,
-                                ),
+                                  .symmetric(
+                                vertical: 16,
                               ),
                             ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _submitForm,
-                      style:
-                      ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: iituRed,
-                        foregroundColor:
-                        Colors.white,
-                        padding:
-                        const EdgeInsets.symmetric(
-                          horizontal: 25,
-                          vertical: 17,
+                            icon: const Icon(
+                              Icons
+                                  .support_agent_outlined,
+                            ),
+                            label: const Text(
+                              'Request Support',
+                            ),
+                          ),
                         ),
-                      ),
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        size: 17,
-                      ),
-                      label: const Text(
-                        'Submit Request',
-                      ),
+
+                        const SizedBox(height: 10),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child:
+                          OutlinedButton(
+                            // Requirement:
+                            // pop() reveals the
+                            // existing previous route.
+                            onPressed: () {
+                              Navigator.pop(
+                                context,
+                              );
+                            },
+                            child: const Text(
+                              'Return to Services',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-
-                    OutlinedButton.icon(
-                      onPressed: _resetForm,
-                      style:
-                      OutlinedButton.styleFrom(
-                        foregroundColor:
-                        darkText,
-                        side: const BorderSide(
-                          color: borderColor,
-                        ),
-                        padding:
-                        const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 17,
-                        ),
-                      ),
-                      icon: const Icon(
-                        Icons.refresh_rounded,
-                        size: 17,
-                      ),
-                      label: const Text(
-                        'Reset',
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (widget.lastRequest !=
-                    null) ...[
-                  const SizedBox(height: 42),
-
-                  LastRequestCard(
-                    request:
-                    widget.lastRequest!,
                   ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -5242,56 +4691,155 @@ class _StudentServicesPageState
 }
 
 // ============================================================
-// EVENT DETAILS PAGE
+// EVENTS SCREEN
 // ============================================================
 
-class EventDetailsPage extends StatefulWidget {
+class EventsScreen extends StatelessWidget {
+  const EventsScreen({super.key});
+
+  void _openEvent(
+      BuildContext context,
+      CampusEvent event,
+      ) {
+    // Requirement: at least one route is opened
+    // directly with Navigator.push + MaterialPageRoute.
+    safePush(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            EventDetailScreen(
+              event: event,
+            ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.events,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          24,
+          55,
+          24,
+          90,
+        ),
+        child: MaxWidth(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              const SectionHeading(
+                eyebrow: 'WHAT’S HAPPENING',
+                title: 'Upcoming Events',
+                subtitle:
+                'Discover academic, career and student opportunities at IITU.',
+              ),
+
+              const SizedBox(height: 30),
+
+              LayoutBuilder(
+                builder: (
+                    context,
+                    constraints,
+                    ) {
+                  double width;
+
+                  if (constraints.maxWidth >=
+                      900) {
+                    width =
+                        (constraints.maxWidth -
+                            28) /
+                            3;
+                  } else if (constraints
+                      .maxWidth >=
+                      600) {
+                    width =
+                        (constraints.maxWidth -
+                            14) /
+                            2;
+                  } else {
+                    width =
+                        constraints.maxWidth;
+                  }
+
+                  return Wrap(
+                    spacing: 14,
+                    runSpacing: 14,
+                    children:
+                    campusEvents.map(
+                          (event) {
+                        return SizedBox(
+                          width: width,
+                          child:
+                          EventFullCard(
+                            event: event,
+                            onTap: () {
+                              _openEvent(
+                                context,
+                                event,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// EVENT DETAIL SCREEN
+// ============================================================
+
+class EventDetailScreen extends StatefulWidget {
   final CampusEvent event;
 
-  const EventDetailsPage({
+  const EventDetailScreen({
     super.key,
     required this.event,
   });
 
   @override
-  State<EventDetailsPage> createState() =>
-      _EventDetailsPageState();
+  State<EventDetailScreen> createState() =>
+      _EventDetailScreenState();
 }
 
-class _EventDetailsPageState
-    extends State<EventDetailsPage> {
-  bool _registered = false;
+class _EventDetailScreenState
+    extends State<EventDetailScreen> {
+  bool registered = false;
 
-  Future<void> _openRegistration() async {
+  Future<void> _register() async {
     final result =
     await showDialog<bool>(
       context: context,
       builder: (
           context,
           ) {
-        return EventRegistrationDialog(
-          event: widget.event,
-        );
+        return const EventRegistrationDialog();
       },
     );
 
     if (result == true && mounted) {
       setState(() {
-        _registered = true;
+        registered = true;
       });
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            'You are registered for ${widget.event.title}.',
+            'Event registration completed.',
           ),
           backgroundColor: successGreen,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(15),
-          ),
         ),
       );
     }
@@ -5306,10 +4854,6 @@ class _EventDetailsPageState
         surfaceTintColor: Colors.white,
         title: const Text(
           'Event Details',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
       body: SafeArea(
@@ -5325,128 +4869,134 @@ class _EventDetailsPageState
             child: ConstrainedBox(
               constraints:
               const BoxConstraints(
-                maxWidth: 1050,
+                maxWidth: 1000,
               ),
               child: Column(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    height: 420,
-                    clipBehavior:
-                    Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      borderRadius:
-                      BorderRadius.circular(
-                        32,
-                      ),
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        AppImage(
-                          path:
-                          widget.event.image,
-                          fit: BoxFit.cover,
+                  // Extension feature:
+                  // Hero animation from event list to details.
+                  Hero(
+                    tag:
+                    'event-${widget.event.title}',
+                    child: Container(
+                      height: 410,
+                      width: double.infinity,
+                      clipBehavior:
+                      Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        borderRadius:
+                        BorderRadius.circular(
+                          30,
                         ),
-                        Container(
-                          decoration:
-                          BoxDecoration(
-                            gradient:
-                            LinearGradient(
-                              begin: Alignment
-                                  .topCenter,
-                              end: Alignment
-                                  .bottomCenter,
-                              colors: [
-                                Colors
-                                    .transparent,
-                                Colors.black
-                                    .withOpacity(
-                                  0.72,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          AppAssetImage(
+                            path:
+                            widget.event.image,
+                          ),
+
+                          Container(
+                            decoration:
+                            BoxDecoration(
+                              gradient:
+                              LinearGradient(
+                                begin: Alignment
+                                    .topCenter,
+                                end: Alignment
+                                    .bottomCenter,
+                                colors: [
+                                  Colors
+                                      .transparent,
+                                  Colors.black
+                                      .withOpacity(
+                                    0.72,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          Positioned(
+                            left: 30,
+                            right: 30,
+                            bottom: 30,
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .start,
+                              children: [
+                                Text(
+                                  widget.event
+                                      .category
+                                      .toUpperCase(),
+                                  style:
+                                  const TextStyle(
+                                    color:
+                                    Colors.white70,
+                                    fontSize: 9,
+                                    letterSpacing:
+                                    1.3,
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: 9,
+                                ),
+                                Text(
+                                  widget
+                                      .event.title,
+                                  style:
+                                  const TextStyle(
+                                    color:
+                                    Colors.white,
+                                    fontSize: 34,
+                                    height: 1.05,
+                                    fontWeight:
+                                    FontWeight
+                                        .w600,
+                                    letterSpacing:
+                                    -1.2,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        Positioned(
-                          left: 32,
-                          right: 32,
-                          bottom: 32,
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
-                            children: [
-                              Text(
-                                widget.event
-                                    .category
-                                    .toUpperCase(),
-                                style:
-                                const TextStyle(
-                                  color:
-                                  Colors.white70,
-                                  fontSize: 9,
-                                  letterSpacing:
-                                  1.4,
-                                  fontWeight:
-                                  FontWeight
-                                      .w600,
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 10,
-                              ),
-                              Text(
-                                widget.event.title,
-                                style:
-                                const TextStyle(
-                                  color:
-                                  Colors.white,
-                                  fontSize: 36,
-                                  height: 1.06,
-                                  fontWeight:
-                                  FontWeight
-                                      .w600,
-                                  letterSpacing:
-                                  -1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 26),
 
                   Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      EventMetaChip(
+                      InfoChip(
                         icon: Icons
                             .calendar_month_outlined,
                         text:
-                        widget.event.fullDate,
+                        widget.event.date,
                       ),
-                      EventMetaChip(
+                      InfoChip(
                         icon: Icons
-                            .access_time_rounded,
+                            .access_time_outlined,
                         text:
                         widget.event.time,
                       ),
-                      EventMetaChip(
+                      InfoChip(
                         icon: Icons
                             .location_on_outlined,
                         text:
-                        widget.event.location,
+                        widget.event.venue,
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 34),
+                  const SizedBox(height: 30),
 
                   LayoutBuilder(
                     builder: (
@@ -5455,124 +5005,107 @@ class _EventDetailsPageState
                         ) {
                       final desktop =
                           constraints.maxWidth >=
-                              760;
+                              750;
 
-                      final main =
-                      Column(
+                      final main = Column(
                         crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                        CrossAxisAlignment.start,
                         children: [
                           const Text(
                             'About the event',
                             style: TextStyle(
-                              fontSize: 24,
+                              fontSize: 23,
                               fontWeight:
                               FontWeight.w600,
-                              letterSpacing: -0.7,
                             ),
                           ),
-                          const SizedBox(height: 13),
+                          const SizedBox(
+                            height: 12,
+                          ),
                           Text(
                             widget.event
-                                .longDescription,
+                                .description,
                             style:
                             const TextStyle(
                               color: greyText,
                               fontSize: 13,
-                              height: 1.75,
+                              height: 1.7,
                             ),
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(
+                            height: 28,
+                          ),
                           const Text(
                             'What to expect',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight:
                               FontWeight.w600,
-                              letterSpacing: -0.5,
                             ),
                           ),
-                          const SizedBox(height: 15),
+                          const SizedBox(
+                            height: 14,
+                          ),
                           ...widget
                               .event.expectations
                               .map(
-                                (
-                                item,
-                                ) =>
-                                Padding(
-                                  padding:
-                                  const EdgeInsets
-                                      .only(
-                                    bottom: 12,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 26,
-                                        height: 26,
-                                        alignment:
-                                        Alignment
-                                            .center,
-                                        decoration:
-                                        const BoxDecoration(
-                                          color:
-                                          softRed,
-                                          shape:
-                                          BoxShape
-                                              .circle,
-                                        ),
-                                        child:
-                                        const Icon(
-                                          Icons
-                                              .check_rounded,
-                                          color:
-                                          iituRed,
-                                          size: 15,
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        width: 11,
-                                      ),
-                                      Expanded(
-                                        child: Text(
-                                          item,
-                                          style:
-                                          const TextStyle(
-                                            fontSize:
-                                            12.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                (item) {
+                              return Padding(
+                                padding:
+                                const EdgeInsets
+                                    .only(
+                                  bottom: 11,
                                 ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons
+                                          .check_circle_outline,
+                                      color:
+                                      iituRed,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(
+                                      width: 9,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        item,
+                                        style:
+                                        const TextStyle(
+                                          fontSize:
+                                          12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ],
                       );
 
-                      final registerCard =
+                      final registration =
                       Container(
                         padding:
                         const EdgeInsets.all(
-                          24,
+                          23,
                         ),
                         decoration:
                         BoxDecoration(
                           color: Colors.white,
                           borderRadius:
                           BorderRadius.circular(
-                            25,
+                            24,
                           ),
                           border: Border.all(
-                            color:
-                            borderColor,
+                            color: borderColor,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                          CrossAxisAlignment.start,
                           children: [
                             const Text(
                               'Join this event',
@@ -5584,19 +5117,18 @@ class _EventDetailsPageState
                               ),
                             ),
                             const SizedBox(
-                              height: 8,
+                              height: 7,
                             ),
                             const Text(
-                              'Register using your student details.',
+                              'Register with your student details.',
                               style: TextStyle(
                                 color:
                                 greyText,
-                                fontSize: 11.5,
-                                height: 1.5,
+                                fontSize: 11,
                               ),
                             ),
                             const SizedBox(
-                              height: 20,
+                              height: 18,
                             ),
                             SizedBox(
                               width:
@@ -5604,9 +5136,9 @@ class _EventDetailsPageState
                               child:
                               ElevatedButton.icon(
                                 onPressed:
-                                _registered
+                                registered
                                     ? null
-                                    : _openRegistration,
+                                    : _register,
                                 style:
                                 ElevatedButton
                                     .styleFrom(
@@ -5622,15 +5154,14 @@ class _EventDetailsPageState
                                   ),
                                 ),
                                 icon: Icon(
-                                  _registered
+                                  registered
                                       ? Icons
-                                      .check_circle_outline
+                                      .check_circle
                                       : Icons
                                       .how_to_reg_outlined,
-                                  size: 17,
                                 ),
                                 label: Text(
-                                  _registered
+                                  registered
                                       ? 'Registered'
                                       : 'Register for Event',
                                 ),
@@ -5645,25 +5176,27 @@ class _EventDetailsPageState
                           children: [
                             main,
                             const SizedBox(
-                              height: 28,
+                              height: 25,
                             ),
-                            registerCard,
+                            registration,
                           ],
                         );
                       }
 
                       return Row(
                         crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                        CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: main,
                           ),
-                          const SizedBox(width: 35),
+                          const SizedBox(
+                            width: 30,
+                          ),
                           SizedBox(
-                            width: 300,
-                            child: registerCard,
+                            width: 290,
+                            child:
+                            registration,
                           ),
                         ],
                       );
@@ -5680,16 +5213,13 @@ class _EventDetailsPageState
 }
 
 // ============================================================
-// EVENT REGISTRATION FORM
+// EVENT REGISTRATION
 // ============================================================
 
 class EventRegistrationDialog
     extends StatefulWidget {
-  final CampusEvent event;
-
   const EventRegistrationDialog({
     super.key,
-    required this.event,
   });
 
   @override
@@ -5699,45 +5229,43 @@ class EventRegistrationDialog
 
 class _EventRegistrationDialogState
     extends State<EventRegistrationDialog> {
-  final GlobalKey<FormState> _formKey =
+  final GlobalKey<FormState> key =
   GlobalKey<FormState>();
 
-  final TextEditingController _nameController =
+  final nameController =
   TextEditingController(
     text: 'Akvarzhanova Irada',
   );
 
-  final TextEditingController _idController =
+  final idController =
   TextEditingController(
     text: '41151',
   );
 
-  final TextEditingController _emailController =
+  final emailController =
   TextEditingController(
     text: 'irada41151@student.iitu.kz',
   );
 
-  bool _confirm = false;
+  bool confirmed = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _idController.dispose();
-    _emailController.dispose();
+    nameController.dispose();
+    idController.dispose();
+    emailController.dispose();
 
     super.dispose();
   }
 
-  void _register() {
-    final valid =
-        _formKey.currentState?.validate() ??
-            false;
+  void submit() {
+    if (!(key.currentState?.validate() ??
+        false)) {
+      return;
+    }
 
-    if (!valid) return;
-
-    if (!_confirm) {
+    if (!confirmed) {
       setState(() {});
-
       return;
     }
 
@@ -5751,23 +5279,18 @@ class _EventRegistrationDialogState
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      insetPadding:
-      const EdgeInsets.all(20),
       shape: RoundedRectangleBorder(
         borderRadius:
-        BorderRadius.circular(28),
+        BorderRadius.circular(27),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(
-          maxWidth: 500,
+          maxWidth: 480,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(27),
           child: Form(
-            key: _formKey,
-            autovalidateMode:
-            AutovalidateMode
-                .onUserInteraction,
+            key: key,
             child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
@@ -5777,62 +5300,56 @@ class _EventRegistrationDialogState
                   style: TextStyle(
                     color: iituRed,
                     fontSize: 9,
-                    fontWeight: FontWeight.w600,
                     letterSpacing: 1.3,
-                  ),
-                ),
-
-                const SizedBox(height: 9),
-
-                Text(
-                  widget.event.title,
-                  style: const TextStyle(
-                    fontSize: 23,
-                    height: 1.1,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: -0.7,
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+
+                const Text(
+                  'Register for this event',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
 
                 TextFormField(
                   controller:
-                  _nameController,
+                  nameController,
                   decoration:
                   const InputDecoration(
                     labelText: 'Full name',
-                    prefixIcon: Icon(
-                      Icons.person_outline,
-                    ),
                   ),
                   validator: (value) {
-                    final text =
-                        value?.trim() ?? '';
-
-                    if (text.isEmpty ||
-                        !text.contains(' ')) {
-                      return 'Please enter your full name.';
+                    if ((value
+                        ?.trim()
+                        .length ??
+                        0) <
+                        3) {
+                      return 'Enter your full name.';
                     }
 
                     return null;
                   },
                 ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 13),
 
                 TextFormField(
                   controller:
-                  _idController,
+                  idController,
                   decoration:
                   const InputDecoration(
                     labelText: 'Student ID',
-                    prefixIcon: Icon(
-                      Icons.badge_outlined,
-                    ),
                   ),
                   validator: (value) {
-                    if ((value?.trim().length ??
+                    if ((value
+                        ?.trim()
+                        .length ??
                         0) <
                         5) {
                       return 'Enter a valid Student ID.';
@@ -5842,27 +5359,19 @@ class _EventRegistrationDialogState
                   },
                 ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 13),
 
                 TextFormField(
                   controller:
-                  _emailController,
-                  keyboardType:
-                  TextInputType.emailAddress,
+                  emailController,
                   decoration:
                   const InputDecoration(
-                    labelText: 'Campus email',
-                    prefixIcon: Icon(
-                      Icons.email_outlined,
-                    ),
+                    labelText:
+                    'Campus email',
                   ),
                   validator: (value) {
-                    final email =
-                        value?.trim() ?? '';
-
-                    if (!email.contains(
-                      '@',
-                    )) {
+                    if (!(value ?? '')
+                        .contains('@')) {
                       return 'Enter a valid email.';
                     }
 
@@ -5870,57 +5379,40 @@ class _EventRegistrationDialogState
                   },
                 ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 13),
 
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: softGrey,
-                    borderRadius:
-                    BorderRadius.circular(16),
-                  ),
-                  child: CheckboxListTile(
-                    contentPadding:
-                    EdgeInsets.zero,
-                    value: _confirm,
-                    activeColor: iituRed,
-                    controlAffinity:
-                    ListTileControlAffinity
-                        .leading,
-                    title: const Text(
-                      'I confirm my registration.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                        FontWeight.w500,
-                      ),
+                CheckboxListTile(
+                  value: confirmed,
+                  activeColor: iituRed,
+                  contentPadding:
+                  EdgeInsets.zero,
+                  controlAffinity:
+                  ListTileControlAffinity
+                      .leading,
+                  title: const Text(
+                    'I confirm my registration.',
+                    style: TextStyle(
+                      fontSize: 12,
                     ),
-                    onChanged: (value) {
-                      setState(() {
-                        _confirm =
-                            value ?? false;
-                      });
-                    },
                   ),
+                  onChanged: (value) {
+                    setState(() {
+                      confirmed =
+                          value ?? false;
+                    });
+                  },
                 ),
 
-                if (!_confirm)
-                  const Padding(
-                    padding:
-                    EdgeInsets.only(
-                      top: 7,
-                      left: 10,
-                    ),
-                    child: Text(
-                      'Please confirm your registration.',
-                      style: TextStyle(
-                        color: iituRed,
-                        fontSize: 10.5,
-                      ),
+                if (!confirmed)
+                  const Text(
+                    'Please confirm your registration.',
+                    style: TextStyle(
+                      color: iituRed,
+                      fontSize: 10,
                     ),
                   ),
 
-                const SizedBox(height: 22),
+                const SizedBox(height: 20),
 
                 Row(
                   children: [
@@ -5931,17 +5423,18 @@ class _EventRegistrationDialogState
                             context,
                           );
                         },
-                        child:
-                        const Text('Cancel'),
+                        child: const Text(
+                          'Cancel',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child:
-                      ElevatedButton(
-                        onPressed: _register,
+                      child: ElevatedButton(
+                        onPressed: submit,
                         style:
-                        ElevatedButton.styleFrom(
+                        ElevatedButton
+                            .styleFrom(
                           elevation: 0,
                           backgroundColor:
                           iituRed,
@@ -5949,7 +5442,9 @@ class _EventRegistrationDialogState
                           Colors.white,
                         ),
                         child:
-                        const Text('Register'),
+                        const Text(
+                          'Register',
+                        ),
                       ),
                     ),
                   ],
@@ -5964,31 +5459,823 @@ class _EventRegistrationDialogState
 }
 
 // ============================================================
-// HOME STUDENT SUPPORT PROMO
+// CAMPUS - INTERACTIVE MAP
 // ============================================================
 
-class StudentSupportPromo
-    extends StatefulWidget {
-  final VoidCallback onOpenServices;
-  final VoidCallback onOpenStatus;
-  final bool hasRequest;
+class CampusPlace {
+  final String name;
+  final String description;
+  final IconData icon;
+  final double x;
+  final double y;
 
-  const StudentSupportPromo({
+  const CampusPlace({
+    required this.name,
+    required this.description,
+    required this.icon,
+    required this.x,
+    required this.y,
+  });
+}
+
+class CampusScreen extends StatefulWidget {
+  const CampusScreen({super.key});
+
+  @override
+  State<CampusScreen> createState() => _CampusScreenState();
+}
+
+class _CampusScreenState extends State<CampusScreen> {
+  int selectedFloor = 1;
+  CampusPlace? selectedPlace;
+
+  final Map<int, List<CampusPlace>> floorPlaces = const {
+    1: [
+      CampusPlace(
+        name: 'Main Entrance',
+        description: 'Main entrance and reception area.',
+        icon: Icons.door_front_door_outlined,
+        x: 0.14,
+        y: 0.76,
+      ),
+      CampusPlace(
+        name: 'Cafeteria',
+        description: 'Food, drinks and a comfortable student area.',
+        icon: Icons.restaurant_outlined,
+        x: 0.72,
+        y: 0.68,
+      ),
+      CampusPlace(
+        name: 'Student Services',
+        description: 'Student documents, support and general assistance.',
+        icon: Icons.support_agent_outlined,
+        x: 0.67,
+        y: 0.23,
+      ),
+      CampusPlace(
+        name: 'Event Hall',
+        description: 'University events, meetings and presentations.',
+        icon: Icons.groups_outlined,
+        x: 0.22,
+        y: 0.26,
+      ),
+    ],
+
+    2: [
+      CampusPlace(
+        name: 'Computer Lab',
+        description: 'Computer laboratory for practical classes.',
+        icon: Icons.computer_outlined,
+        x: 0.18,
+        y: 0.25,
+      ),
+      CampusPlace(
+        name: 'Classrooms',
+        description: 'Teaching rooms for lectures and seminars.',
+        icon: Icons.school_outlined,
+        x: 0.72,
+        y: 0.25,
+      ),
+      CampusPlace(
+        name: 'Study Area',
+        description: 'Open student space for individual and group study.',
+        icon: Icons.menu_book_outlined,
+        x: 0.20,
+        y: 0.70,
+      ),
+      CampusPlace(
+        name: 'Meeting Room',
+        description: 'Space for teamwork and student meetings.',
+        icon: Icons.meeting_room_outlined,
+        x: 0.72,
+        y: 0.70,
+      ),
+    ],
+
+    3: [
+      CampusPlace(
+        name: 'Library',
+        description: 'Books, academic resources and quiet study spaces.',
+        icon: Icons.local_library_outlined,
+        x: 0.20,
+        y: 0.24,
+      ),
+      CampusPlace(
+        name: 'Reading Zone',
+        description: 'Quiet area for reading and individual work.',
+        icon: Icons.auto_stories_outlined,
+        x: 0.70,
+        y: 0.24,
+      ),
+      CampusPlace(
+        name: 'Discussion Rooms',
+        description: 'Rooms for group discussions and project work.',
+        icon: Icons.forum_outlined,
+        x: 0.20,
+        y: 0.70,
+      ),
+      CampusPlace(
+        name: 'Media Room',
+        description: 'Multimedia and digital learning area.',
+        icon: Icons.video_library_outlined,
+        x: 0.70,
+        y: 0.70,
+      ),
+    ],
+
+    4: [
+      CampusPlace(
+        name: 'Research Labs',
+        description: 'Laboratories for university research projects.',
+        icon: Icons.science_outlined,
+        x: 0.18,
+        y: 0.25,
+      ),
+      CampusPlace(
+        name: 'Innovation Hub',
+        description: 'Space for startups, innovation and new ideas.',
+        icon: Icons.lightbulb_outline,
+        x: 0.72,
+        y: 0.25,
+      ),
+      CampusPlace(
+        name: 'Project Rooms',
+        description: 'Team rooms for student projects.',
+        icon: Icons.workspaces_outline,
+        x: 0.18,
+        y: 0.70,
+      ),
+      CampusPlace(
+        name: 'Faculty Space',
+        description: 'Academic staff collaboration area.',
+        icon: Icons.people_outline,
+        x: 0.72,
+        y: 0.70,
+      ),
+    ],
+
+    5: [
+      CampusPlace(
+        name: 'Faculty Offices',
+        description: 'University faculty and lecturer offices.',
+        icon: Icons.business_outlined,
+        x: 0.18,
+        y: 0.25,
+      ),
+      CampusPlace(
+        name: 'Conference Room',
+        description: 'Meetings, conferences and presentations.',
+        icon: Icons.co_present_outlined,
+        x: 0.72,
+        y: 0.25,
+      ),
+      CampusPlace(
+        name: 'Quiet Study Space',
+        description: 'Quiet area for focused academic work.',
+        icon: Icons.headphones_outlined,
+        x: 0.18,
+        y: 0.70,
+      ),
+      CampusPlace(
+        name: 'Administration',
+        description: 'University administration offices.',
+        icon: Icons.account_balance_outlined,
+        x: 0.72,
+        y: 0.70,
+      ),
+    ],
+  };
+
+  List<CampusPlace> get currentPlaces =>
+      floorPlaces[selectedFloor] ?? [];
+
+  void selectFloor(int floor) {
+    setState(() {
+      selectedFloor = floor;
+      selectedPlace = null;
+    });
+  }
+
+  void selectPlace(CampusPlace place) {
+    setState(() {
+      selectedPlace = place;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.campus,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          24,
+          55,
+          24,
+          90,
+        ),
+        child: MaxWidth(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionHeading(
+                eyebrow: 'CAMPUS NAVIGATOR',
+                title: 'Find your way around IITU.',
+                subtitle:
+                'Choose a floor and select a location on the interactive campus map.',
+              ),
+
+              const SizedBox(height: 30),
+
+              // FLOOR BUTTONS
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: borderColor,
+                  ),
+                ),
+                child: Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: List.generate(
+                    5,
+                        (index) {
+                      final floor = index + 1;
+                      final selected = selectedFloor == floor;
+
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () => selectFloor(floor),
+                        child: AnimatedContainer(
+                          duration: const Duration(
+                            milliseconds: 200,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                            selected ? iituRed : Colors.transparent,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            'Level $floor',
+                            style: TextStyle(
+                              color:
+                              selected ? Colors.white : greyText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final desktop = constraints.maxWidth >= 850;
+
+                  final map = CampusInteractiveMap(
+                    floor: selectedFloor,
+                    places: currentPlaces,
+                    selectedPlace: selectedPlace,
+                    onPlaceSelected: selectPlace,
+                  );
+
+                  final info = CampusMapSidePanel(
+                    floor: selectedFloor,
+                    places: currentPlaces,
+                    selectedPlace: selectedPlace,
+                    onPlaceSelected: selectPlace,
+                  );
+
+                  if (!desktop) {
+                    return Column(
+                      children: [
+                        map,
+                        const SizedBox(height: 18),
+                        info,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: map,
+                      ),
+                      const SizedBox(width: 20),
+                      SizedBox(
+                        width: 310,
+                        child: info,
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 85),
+
+              const CampusLifeSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// INTERACTIVE FLOOR MAP
+// ============================================================
+
+class CampusInteractiveMap extends StatelessWidget {
+  final int floor;
+  final List<CampusPlace> places;
+  final CampusPlace? selectedPlace;
+  final ValueChanged<CampusPlace> onPlaceSelected;
+
+  const CampusInteractiveMap({
     super.key,
-    required this.onOpenServices,
-    required this.onOpenStatus,
-    required this.hasRequest,
+    required this.floor,
+    required this.places,
+    required this.selectedPlace,
+    required this.onPlaceSelected,
   });
 
   @override
-  State<StudentSupportPromo> createState() =>
-      _StudentSupportPromoState();
+  Widget build(BuildContext context) {
+    return Container(
+      height: 590,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: borderColor,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'INTERACTIVE MAP',
+                    style: TextStyle(
+                      color: iituRed,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Level $floor',
+                    style: const TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                ],
+              ),
+
+              const Spacer(),
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: softRed,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.touch_app_outlined,
+                      color: iituRed,
+                      size: 15,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Select a place',
+                      style: TextStyle(
+                        color: iituRed,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final mapWidth = constraints.maxWidth;
+                final mapHeight = constraints.maxHeight;
+
+                return Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F3F1),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: const Color(0xFFE0DFDC),
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // FLOOR PLAN BACKGROUND
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: CampusFloorPainter(),
+                        ),
+                      ),
+
+                      // YOU ARE HERE
+                      Positioned(
+                        left: 18,
+                        bottom: 17,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 12,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.my_location,
+                                color: iituRed,
+                                size: 14,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'You are here',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // PLACES
+                      ...places.map(
+                            (place) {
+                          final selected =
+                              selectedPlace?.name == place.name;
+
+                          final left =
+                              (mapWidth - 120) * place.x;
+                          final top =
+                              (mapHeight - 75) * place.y;
+
+                          return AnimatedPositioned(
+                            duration: const Duration(
+                              milliseconds: 350,
+                            ),
+                            curve: Curves.easeOutCubic,
+                            left: left,
+                            top: top,
+                            child: CampusMapMarker(
+                              place: place,
+                              selected: selected,
+                              onTap: () {
+                                onPlaceSelected(place);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+
+                      // ANIMATED STUDENT MARKER
+                      AnimatedPositioned(
+                        duration: const Duration(
+                          milliseconds: 650,
+                        ),
+                        curve: Curves.easeInOutCubic,
+                        left: selectedPlace == null
+                            ? mapWidth * 0.43
+                            : (mapWidth - 45) *
+                            selectedPlace!.x,
+                        top: selectedPlace == null
+                            ? mapHeight * 0.43
+                            : (mapHeight - 45) *
+                            selectedPlace!.y +
+                            43,
+                        child: const StudentMapMarker(),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _StudentSupportPromoState
-    extends State<StudentSupportPromo>
+// ============================================================
+// MAP BACKGROUND DRAWING
+// ============================================================
+
+class CampusFloorPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final wallPaint = Paint()
+      ..color = const Color(0xFFD3D1CC)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final corridorPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final roomPaint = Paint()
+      ..color = const Color(0xFFE8E7E3)
+      ..style = PaintingStyle.fill;
+
+    final roomBorder = Paint()
+      ..color = const Color(0xFFD6D4CF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+
+    final outer = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.05,
+        size.height * 0.08,
+        size.width * 0.90,
+        size.height * 0.80,
+      ),
+      const Radius.circular(22),
+    );
+
+    canvas.drawRRect(
+      outer,
+      corridorPaint,
+    );
+
+    canvas.drawRRect(
+      outer,
+      wallPaint,
+    );
+
+    final rooms = [
+      Rect.fromLTWH(
+        size.width * 0.09,
+        size.height * 0.13,
+        size.width * 0.28,
+        size.height * 0.24,
+      ),
+      Rect.fromLTWH(
+        size.width * 0.63,
+        size.height * 0.13,
+        size.width * 0.28,
+        size.height * 0.24,
+      ),
+      Rect.fromLTWH(
+        size.width * 0.09,
+        size.height * 0.59,
+        size.width * 0.28,
+        size.height * 0.23,
+      ),
+      Rect.fromLTWH(
+        size.width * 0.63,
+        size.height * 0.59,
+        size.width * 0.28,
+        size.height * 0.23,
+      ),
+    ];
+
+    for (final room in rooms) {
+      final rrect =
+      RRect.fromRectAndRadius(
+        room,
+        const Radius.circular(15),
+      );
+
+      canvas.drawRRect(
+        rrect,
+        roomPaint,
+      );
+
+      canvas.drawRRect(
+        rrect,
+        roomBorder,
+      );
+    }
+
+    // central horizontal corridor
+    canvas.drawLine(
+      Offset(
+        size.width * 0.10,
+        size.height * 0.48,
+      ),
+      Offset(
+        size.width * 0.90,
+        size.height * 0.48,
+      ),
+      wallPaint,
+    );
+
+    // central vertical corridor
+    canvas.drawLine(
+      Offset(
+        size.width * 0.50,
+        size.height * 0.10,
+      ),
+      Offset(
+        size.width * 0.50,
+        size.height * 0.84,
+      ),
+      wallPaint,
+    );
+
+    // little entrance opening
+    canvas.drawLine(
+      Offset(
+        size.width * 0.43,
+        size.height * 0.88,
+      ),
+      Offset(
+        size.width * 0.57,
+        size.height * 0.88,
+      ),
+      Paint()
+        ..color = const Color(0xFFF4F3F1)
+        ..strokeWidth = 5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(
+      covariant CustomPainter oldDelegate,
+      ) {
+    return false;
+  }
+}
+
+// ============================================================
+// MAP MARKER
+// ============================================================
+
+class CampusMapMarker extends StatefulWidget {
+  final CampusPlace place;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const CampusMapMarker({
+    super.key,
+    required this.place,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  State<CampusMapMarker> createState() =>
+      _CampusMapMarkerState();
+}
+
+class _CampusMapMarkerState
+    extends State<CampusMapMarker> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = hover || widget.selected;
+
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: InkWell(
+        borderRadius: BorderRadius.circular(17),
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
+          ),
+          width: 115,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 9,
+          ),
+          decoration: BoxDecoration(
+            color: active ? iituRed : Colors.white,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color:
+              active ? iituRed : borderColor,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(
+                  active ? 0.10 : 0.045,
+                ),
+                blurRadius: active ? 18 : 9,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.place.icon,
+                color:
+                active ? Colors.white : iituRed,
+                size: 16,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  widget.place.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: active
+                        ? Colors.white
+                        : darkText,
+                    fontSize: 8.5,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// STUDENT MARKER
+// ============================================================
+
+class StudentMapMarker extends StatefulWidget {
+  const StudentMapMarker({
+    super.key,
+  });
+
+  @override
+  State<StudentMapMarker> createState() =>
+      _StudentMapMarkerState();
+}
+
+class _StudentMapMarkerState
+    extends State<StudentMapMarker>
     with SingleTickerProviderStateMixin {
-  late final AnimationController controller;
+  late AnimationController controller;
+  late Animation<double> animation;
 
   @override
   void initState() {
@@ -5997,10 +6284,20 @@ class _StudentSupportPromoState
     controller = AnimationController(
       vsync: this,
       duration: const Duration(
-        seconds: 4,
+        milliseconds: 1200,
       ),
     )..repeat(
       reverse: true,
+    );
+
+    animation = Tween<double>(
+      begin: 0,
+      end: -5,
+    ).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: Curves.easeInOut,
+      ),
     );
   }
 
@@ -6012,303 +6309,1402 @@ class _StudentSupportPromoState
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-      children: [
-        const PremiumHeading(
-          eyebrow: 'STUDENT SUPPORT',
-          title: 'Help when you need it.',
-          subtitle:
-          'Find the right campus service and submit a request without searching through departments.',
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(
+            0,
+            animation.value,
+          ),
+          child: child,
+        );
+      },
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: iituRed,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white,
+            width: 3,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: iituRed.withOpacity(0.25),
+              blurRadius: 18,
+              spreadRadius: 4,
+            ),
+          ],
         ),
+        child: const Icon(
+          Icons.person_rounded,
+          color: Colors.white,
+          size: 21,
+        ),
+      ),
+    );
+  }
+}
 
-        const SizedBox(height: 38),
+// ============================================================
+// CAMPUS SIDE PANEL
+// ============================================================
 
-        LayoutBuilder(
-          builder: (
-              context,
-              constraints,
-              ) {
-            final desktop =
-                constraints.maxWidth >= 900;
+class CampusMapSidePanel extends StatelessWidget {
+  final int floor;
+  final List<CampusPlace> places;
+  final CampusPlace? selectedPlace;
+  final ValueChanged<CampusPlace> onPlaceSelected;
 
-            if (!desktop) {
-              return Column(
-                children: [
-                  _centerCard(),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+  const CampusMapSidePanel({
+    super.key,
+    required this.floor,
+    required this.places,
+    required this.selectedPlace,
+    required this.onPlaceSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'LEVEL $floor',
+            style: const TextStyle(
+              color: iituRed,
+              fontSize: 9,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 7),
+
+          const Text(
+            'Places',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          const Text(
+            'Select a location to see it on the map.',
+            style: TextStyle(
+              color: greyText,
+              fontSize: 10.5,
+              height: 1.4,
+            ),
+          ),
+
+          const SizedBox(height: 19),
+
+          ...places.map(
+                (place) {
+              final selected =
+                  selectedPlace?.name == place.name;
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(17),
+                onTap: () {
+                  onPlaceSelected(place);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(
+                    milliseconds: 180,
+                  ),
+                  margin: const EdgeInsets.only(
+                    bottom: 9,
+                  ),
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color:
+                    selected ? softRed : softGrey,
+                    borderRadius: BorderRadius.circular(17),
+                    border: Border.all(
+                      color: selected
+                          ? iituRed
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      SupportFeatureCard(
-                        icon:
-                        Icons.flash_on_outlined,
-                        title: 'Quick Help',
-                        text:
-                        'Find the right service quickly.',
-                        onTap:
-                        widget.onOpenServices,
+                      Container(
+                        width: 37,
+                        height: 37,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                          BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          place.icon,
+                          color: iituRed,
+                          size: 18,
+                        ),
                       ),
-                      SupportFeatureCard(
-                        icon:
-                        Icons.report_problem_outlined,
-                        title: 'Common Issues',
-                        text:
-                        'Wi-Fi, ID, dormitory and documents.',
-                        onTap:
-                        widget.onOpenServices,
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: Text(
+                          place.name,
+                          style: TextStyle(
+                            color: selected
+                                ? iituRed
+                                : darkText,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      SupportFeatureCard(
-                        icon:
-                        Icons.receipt_long_outlined,
-                        title:
-                        'Request Status',
-                        text: widget.hasRequest
-                            ? 'Your latest request is available.'
-                            : 'No submitted request yet.',
-                        onTap:
-                        widget.onOpenStatus,
-                      ),
-                      SupportFeatureCard(
-                        icon:
-                        Icons.support_agent_outlined,
-                        title:
-                        'Service Request',
-                        text:
-                        'Submit an issue online.',
-                        onTap:
-                        widget.onOpenServices,
+
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: greyText,
+                        size: 18,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
-                  _mainButton(),
-                ],
+                ),
               );
-            }
+            },
+          ),
 
-            return Container(
-              height: 500,
+          if (selectedPlace != null) ...[
+            const SizedBox(height: 15),
+
+            Container(
               width: double.infinity,
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(
-                  0xFFFBFBFC,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    iituDarkRed,
+                    iituRed,
+                  ],
                 ),
-                borderRadius:
-                BorderRadius.circular(34),
-                border: Border.all(
-                  color: borderColor,
-                ),
+                borderRadius: BorderRadius.circular(21),
               ),
-              child: AnimatedBuilder(
-                animation: controller,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    selectedPlace!.icon,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+
+                  const SizedBox(height: 13),
+
+                  Text(
+                    selectedPlace!.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  Text(
+                    selectedPlace!.description,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 9.5,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.layers_outlined,
+                        color: Colors.white70,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Level $floor',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// PROFILE
+// ============================================================
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.profile,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          24,
+          55,
+          24,
+          90,
+        ),
+        child: MaxWidth(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              const SectionHeading(
+                eyebrow: 'STUDENT PROFILE',
+                title: 'Your academic space.',
+                subtitle:
+                'Personal information, progress and academic records in one place.',
+              ),
+
+              const SizedBox(height: 30),
+
+              LayoutBuilder(
                 builder: (
                     context,
-                    child,
+                    constraints,
                     ) {
-                  final float =
-                      math.sin(
-                        controller.value *
-                            math.pi,
-                      ) *
-                          7;
+                  final desktop =
+                      constraints.maxWidth >= 850;
 
-                  return Stack(
+                  if (!desktop) {
+                    return const Column(
+                      children: [
+                        ProfileIdentityCard(),
+                        SizedBox(height: 22),
+                        AcademicOverview(),
+                      ],
+                    );
+                  }
+
+                  return const Row(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
                     children: [
-                      Positioned(
-                        left: 44,
-                        top: 55,
-                        width: 245,
+                      SizedBox(
+                        width: 330,
                         child:
-                        SupportFeatureCard(
-                          icon: Icons
-                              .flash_on_outlined,
-                          title: 'Quick Help',
-                          text:
-                          'Find the right campus service quickly.',
-                          onTap: widget
-                              .onOpenServices,
-                        ),
+                        ProfileIdentityCard(),
                       ),
-
-                      Positioned(
-                        left: 72,
-                        bottom: 76,
-                        width: 245,
+                      SizedBox(width: 22),
+                      Expanded(
                         child:
-                        SupportFeatureCard(
-                          icon: Icons
-                              .report_problem_outlined,
-                          title:
-                          'Common Issues',
-                          text:
-                          'Wi-Fi, ID card, dormitory, documents and more.',
-                          onTap: widget
-                              .onOpenServices,
-                        ),
-                      ),
-
-                      Positioned(
-                        right: 45,
-                        top: 55,
-                        width: 245,
-                        child:
-                        SupportFeatureCard(
-                          icon: Icons
-                              .receipt_long_outlined,
-                          title:
-                          'Request Status',
-                          text: widget
-                              .hasRequest
-                              ? 'Check your latest submitted request.'
-                              : 'No active request yet.',
-                          onTap: widget
-                              .onOpenStatus,
-                        ),
-                      ),
-
-                      Positioned(
-                        right: 72,
-                        bottom: 76,
-                        width: 245,
-                        child:
-                        SupportFeatureCard(
-                          icon: Icons
-                              .support_agent_outlined,
-                          title:
-                          'Service Request',
-                          text:
-                          'Submit an issue online in a few steps.',
-                          onTap: widget
-                              .onOpenServices,
-                        ),
-                      ),
-
-                      Align(
-                        alignment:
-                        Alignment.center,
-                        child:
-                        Transform.translate(
-                          offset: Offset(
-                            0,
-                            -float,
-                          ),
-                          child:
-                          _centerCard(),
-                        ),
+                        AcademicOverview(),
                       ),
                     ],
                   );
                 },
               ),
-            );
-          },
+            ],
+          ),
         ),
-
-        const SizedBox(height: 22),
-
-        Align(
-          alignment: Alignment.center,
-          child: _mainButton(),
-        ),
-      ],
+      ),
     );
   }
+}
 
-  Widget _centerCard() {
+class ProfileIdentityCard
+    extends StatelessWidget {
+  const ProfileIdentityCard({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      width: 300,
-      padding: const EdgeInsets.all(26),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 105,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  iituDarkRed,
+                  iituRed,
+                ],
+              ),
+            ),
+          ),
+
+          Transform.translate(
+            offset: const Offset(
+              0,
+              -48,
+            ),
+            child: const CircleAvatar(
+              radius: 54,
+              backgroundColor: Colors.white,
+              child: CircleAvatar(
+                radius: 49,
+                backgroundImage: AssetImage(
+                  'assets/images/profile_irada.png',
+                ),
+              ),
+            ),
+          ),
+
+          Transform.translate(
+            offset: const Offset(0, -34),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Column(
+                children: [
+                  const Text(
+                    'Akvarzhanova Irada',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Network Security',
+                    style: TextStyle(
+                      color: iituRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '3rd Year · Student ID 41151',
+                    style: TextStyle(
+                      color: greyText,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  const ProfileInfoLine(
+                    icon: Icons.email_outlined,
+                    text: 'irada41151@student.iitu.kz',
+                  ),
+                  const ProfileInfoLine(
+                    icon: Icons.school_outlined,
+                    text: 'International Information Technology University',
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        showDialog<void>(
+                          context: context,
+                          builder: (dialogContext) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            title: const Text('Student Card'),
+                            content: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircleAvatar(
+                                  radius: 38,
+                                  backgroundImage: AssetImage(
+                                    'assets/images/profile_irada.png',
+                                  ),
+                                ),
+                                SizedBox(height: 14),
+                                Text(
+                                  'Akvarzhanova Irada',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 5),
+                                Text('Student ID 41151'),
+                                Text('Network Security · 3rd Year'),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.badge_outlined),
+                      label: const Text('View Student Card'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AcademicOverview
+    extends StatelessWidget {
+  const AcademicOverview({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(27),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ACADEMIC OVERVIEW',
+            style: TextStyle(
+              color: iituRed,
+              fontSize: 9,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 7),
+
+          const Text(
+            'Current progress',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 23),
+
+          LayoutBuilder(
+            builder: (
+                context,
+                constraints,
+                ) {
+              final width =
+              constraints.maxWidth >= 650
+                  ? (constraints.maxWidth -
+                  36) /
+                  4
+                  : (constraints.maxWidth -
+                  12) /
+                  2;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: const [
+                  AcademicMetric(
+                    label: 'SEMESTER',
+                    value: '5',
+                  ),
+                  AcademicMetric(
+                    label: 'GPA',
+                    value: '3.5',
+                  ),
+                  AcademicMetric(
+                    label: 'CREDITS',
+                    value: '90',
+                  ),
+                  AcademicMetric(
+                    label: 'ATTENDANCE',
+                    value: '92%',
+                  ),
+                ].map(
+                      (metric) {
+                    return SizedBox(
+                      width: width,
+                      child: metric,
+                    );
+                  },
+                ).toList(),
+              );
+            },
+          ),
+
+          const SizedBox(height: 28),
+
+          const Text(
+            'Academic Records',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 13),
+
+          const AcademicRecordTile(
+            icon:
+            Icons.description_outlined,
+            title: 'Transcript',
+          ),
+          const AcademicRecordTile(
+            icon:
+            Icons.emoji_events_outlined,
+            title: 'Achievements',
+          ),
+          const AcademicRecordTile(
+            icon: Icons.science_outlined,
+            title: 'Research',
+          ),
+          const AcademicRecordTile(
+            icon:
+            Icons.account_balance_wallet_outlined,
+            title: 'Financial Status',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// UNKNOWN ROUTE
+// ============================================================
+
+class UnknownRouteScreen
+    extends StatelessWidget {
+  final String routeName;
+
+  const UnknownRouteScreen({
+    super.key,
+    required this.routeName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: pageBackground,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(25),
+            child: Container(
+              constraints:
+              const BoxConstraints(
+                maxWidth: 520,
+              ),
+              padding: const EdgeInsets.all(35),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                BorderRadius.circular(30),
+                border: Border.all(
+                  color: borderColor,
+                ),
+              ),
+              child: Column(
+                mainAxisSize:
+                MainAxisSize.min,
+                children: [
+                  const Text(
+                    '404',
+                    style: TextStyle(
+                      color: iituRed,
+                      fontSize: 58,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  const Text(
+                    'Page not found',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    'The route "$routeName" could not be opened.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: greyText,
+                      fontSize: 12,
+                    ),
+                  ),
+
+                  const SizedBox(height: 23),
+
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.popUntil(
+                        context,
+                        ModalRoute.withName(
+                          AppRoutes.home,
+                        ),
+                      );
+                    },
+                    style:
+                    ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor: iituRed,
+                      foregroundColor:
+                      Colors.white,
+                    ),
+                    child: const Text(
+                      'Return Home',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// REUSABLE SERVICE CARD
+// ============================================================
+
+class ServiceCard extends StatefulWidget {
+  final CampusService service;
+  final VoidCallback onTap;
+
+  const ServiceCard({
+    super.key,
+    required this.service,
+    required this.onTap,
+  });
+
+  @override
+  State<ServiceCard> createState() =>
+      _ServiceCardState();
+}
+
+class _ServiceCardState
+    extends State<ServiceCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius:
+        BorderRadius.circular(23),
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
+          ),
+          height: 175,
+          padding: const EdgeInsets.all(21),
+          decoration: BoxDecoration(
+            color: hover
+                ? widget.service.color.withOpacity(0.07)
+                : Colors.white,
+            borderRadius:
+            BorderRadius.circular(23),
+            border: Border.all(
+              color: hover ? widget.service.color : borderColor,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: hover
+                          ? Colors.white
+                          : widget.service.color.withOpacity(0.10),
+                      borderRadius:
+                      BorderRadius.circular(
+                        14,
+                      ),
+                    ),
+                    child: Icon(
+                      widget.service.icon,
+                      color: widget.service.color,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.north_east,
+                    color: widget.service.color,
+                    size: 17,
+                  ),
+                ],
+              ),
+
+              const Spacer(),
+
+              Text(
+                widget.service.name,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              Text(
+                widget.service.description,
+                maxLines: 2,
+                overflow:
+                TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: greyText,
+                  fontSize: 9.5,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// EVENT CARDS
+// ============================================================
+
+class EventFullCard extends StatefulWidget {
+  final CampusEvent event;
+  final VoidCallback onTap;
+
+  const EventFullCard({
+    super.key,
+    required this.event,
+    required this.onTap,
+  });
+
+  @override
+  State<EventFullCard> createState() =>
+      _EventFullCardState();
+}
+
+class _EventFullCardState
+    extends State<EventFullCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius:
+        BorderRadius.circular(25),
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 190,
+          ),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius:
+            BorderRadius.circular(25),
+            border: Border.all(
+              color:
+              hover ? iituRed : borderColor,
+            ),
+            boxShadow: hover
+                ? [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(0.05),
+                blurRadius: 25,
+                offset:
+                const Offset(0, 10),
+              ),
+            ]
+                : [],
+          ),
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Hero(
+                tag:
+                'event-${widget.event.title}',
+                child: SizedBox(
+                  height: 215,
+                  width: double.infinity,
+                  child: AppAssetImage(
+                    path:
+                    widget.event.image,
+                  ),
+                ),
+              ),
+
+              Padding(
+                padding:
+                const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          widget.event.category.toUpperCase(),
+                          style: const TextStyle(
+                            color: iituRed,
+                            fontSize: 9.5,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF7F0),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Registration open',
+                            style: TextStyle(
+                              color: successGreen,
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      widget.event.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Text(
+                      widget.event.date,
+                      style: const TextStyle(
+                        color: greyText,
+                        fontSize: 10.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    const Row(
+                      children: [
+                        Text(
+                          'View Event',
+                          style: TextStyle(
+                            color: iituRed,
+                            fontSize: 10.5,
+                            fontWeight:
+                            FontWeight.w600,
+                          ),
+                        ),
+                        Spacer(),
+                        Icon(
+                          Icons.north_east,
+                          color: iituRed,
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class EventPreviewCard extends StatelessWidget {
+  final CampusEvent event;
+  final VoidCallback onTap;
+
+  const EventPreviewCard({
+    super.key,
+    required this.event,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius:
+      BorderRadius.circular(23),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius:
+          BorderRadius.circular(23),
+          border: Border.all(
+            color: borderColor,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 175,
+              width: double.infinity,
+              child: AppAssetImage(
+                path: event.image,
+              ),
+            ),
+            Padding(
+              padding:
+              const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.category
+                        .toUpperCase(),
+                    style: const TextStyle(
+                      color: iituRed,
+                      fontSize: 8,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    event.title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight:
+                      FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    event.date,
+                    style: const TextStyle(
+                      color: greyText,
+                      fontSize: 9.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// FORM REUSABLE WIDGETS
+// ============================================================
+
+class FormSection extends StatelessWidget {
+  final String number;
+  final String title;
+  final Widget child;
+
+  const FormSection({
+    super.key,
+    required this.number,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(27),
+        border: Border.all(
+          color: borderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: softRed,
+                  borderRadius:
+                  BorderRadius.circular(13),
+                ),
+                child: Text(
+                  number,
+                  style: const TextStyle(
+                    color: iituRed,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class ChoicePill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const ChoicePill({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius:
+      BorderRadius.circular(30),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 170,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 11,
+        ),
+        decoration: BoxDecoration(
+          color:
+          selected ? softRed : Colors.white,
+          borderRadius:
+          BorderRadius.circular(30),
+          border: Border.all(
+            color:
+            selected ? iituRed : borderColor,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color:
+            selected ? iituRed : darkText,
+            fontSize: 10.5,
+            fontWeight: selected
+                ? FontWeight.w600
+                : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SummaryLine extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const SummaryLine({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+      const EdgeInsets.only(
+        bottom: 11,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: greyText,
+                fontSize: 10.5,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// COMMON INFO WIDGETS
+// ============================================================
+
+class DetailInformationRow
+    extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const DetailInformationRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: 11,
+      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(17),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: iituRed,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: greyText,
+                    fontSize: 9.5,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const InfoChip({
+    super.key,
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 13,
+        vertical: 9,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
           color: borderColor,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.055),
-            blurRadius: 35,
-            offset: const Offset(
-              0,
-              16,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: iituRed,
+            size: 15,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    );
+  }
+}
+
+// ============================================================
+// PROFILE WIDGETS
+// ============================================================
+
+class ProfileInfoLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const ProfileInfoLine({
+    super.key,
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+      const EdgeInsets.only(
+        bottom: 11,
+      ),
+      child: Row(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 90,
-            height: 32,
-            child: AppImage(
-              path:
-              'assets/images/iitu_logo.png',
-              fit: BoxFit.contain,
-              alignment:
-              Alignment.centerLeft,
-            ),
+          Icon(
+            icon,
+            color: greyText,
+            size: 16,
           ),
-
-          const SizedBox(height: 24),
-
-          const Text(
-            'IITU Student Support',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          const Text(
-            'How can we help?',
-            style: TextStyle(
-              color: greyText,
-              fontSize: 11.5,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          const SupportMockRow(
-            icon: Icons.wifi_rounded,
-            text: 'Wi-Fi / Internet',
-          ),
-
-          const SupportMockRow(
-            icon: Icons.badge_outlined,
-            text: 'Student ID Card',
-          ),
-
-          const SupportMockRow(
-            icon:
-            Icons.description_outlined,
-            text: 'Academic Documents',
-          ),
-
-          const SizedBox(height: 16),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed:
-              widget.onOpenServices,
-              style:
-              ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: iituRed,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text(
-                'Get Help',
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: greyText,
+                fontSize: 10.5,
+                height: 1.4,
               ),
             ),
           ),
@@ -6316,122 +7712,420 @@ class _StudentSupportPromoState
       ),
     );
   }
+}
 
-  Widget _mainButton() {
-    return ElevatedButton.icon(
-      onPressed: widget.onOpenServices,
-      style: ElevatedButton.styleFrom(
-        elevation: 0,
-        backgroundColor: iituRed,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 25,
-          vertical: 17,
-        ),
+class AcademicMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const AcademicMetric({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(19),
       ),
-      icon: const Icon(
-        Icons.arrow_forward_rounded,
-        size: 17,
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        mainAxisAlignment:
+        MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: greyText,
+              fontSize: 8,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 25,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
-      label: const Text(
-        'Get Student Support',
+    );
+  }
+}
+
+class AcademicRecordTile
+    extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const AcademicRecordTile({
+    super.key,
+    required this.icon,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin:
+      const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(17),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: iituRed,
+            size: 19,
+          ),
+          const SizedBox(width: 11),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          const Icon(
+            Icons.north_east,
+            color: greyText,
+            size: 15,
+          ),
+        ],
       ),
     );
   }
 }
 
 // ============================================================
-// DATA CLASSES
+// COMMON CAMPUS IMAGE CARD
 // ============================================================
 
-class CampusEvent {
-  final String title;
-  final String category;
-  final String date;
-  final String fullDate;
-  final String time;
-  final String location;
-  final String description;
-  final String longDescription;
+class CampusImageCard
+    extends StatelessWidget {
   final String image;
-  final List<String> expectations;
-
-  const CampusEvent({
-    required this.title,
-    required this.category,
-    required this.date,
-    required this.fullDate,
-    required this.time,
-    required this.location,
-    required this.description,
-    required this.longDescription,
-    required this.image,
-    required this.expectations,
-  });
-}
-
-class ServiceRequestSummary {
-  final String reference;
-  final String studentName;
-  final String studentId;
-  final String email;
-  final String category;
-  final String subject;
-  final String details;
-  final String urgency;
-  final String contactMethod;
-  final String preferredDate;
-
-  const ServiceRequestSummary({
-    required this.reference,
-    required this.studentName,
-    required this.studentId,
-    required this.email,
-    required this.category,
-    required this.subject,
-    required this.details,
-    required this.urgency,
-    required this.contactMethod,
-    required this.preferredDate,
-  });
-}
-
-class FloorPlace {
-  final String name;
-  final String description;
-  final IconData icon;
-  final Alignment position;
-
-  const FloorPlace({
-    required this.name,
-    required this.description,
-    required this.icon,
-    required this.position,
-  });
-}
-
-class AcademicItem {
-  final IconData icon;
   final String title;
   final String subtitle;
 
-  const AcademicItem(
-      this.icon,
-      this.title,
-      this.subtitle,
-      );
+  const CampusImageCard({
+    super.key,
+    required this.image,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          AppAssetImage(
+            path: image,
+          ),
+
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(
+                    0.7,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 22,
+            right: 22,
+            bottom: 22,
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ============================================================
-// COMMON IMAGE
+// COMMON LAYOUT / STYLE
 // ============================================================
 
-class AppImage extends StatelessWidget {
+class MaxWidth extends StatelessWidget {
+  final Widget child;
+
+  const MaxWidth({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints:
+        const BoxConstraints(
+          maxWidth: 1220,
+        ),
+        child: Padding(
+          padding:
+          const EdgeInsets.symmetric(
+            horizontal: 24,
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class SectionHeading extends StatelessWidget {
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+
+  const SectionHeading({
+    super.key,
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Text(
+          eyebrow,
+          style: const TextStyle(
+            color: iituRed,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 33,
+            height: 1.12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: greyText,
+            fontSize: 12.5,
+            height: 1.55,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AcademicMiniValue
+    extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const AcademicMiniValue({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 90,
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: greyText,
+              fontSize: 8,
+              letterSpacing: 0.8,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class NavButton extends StatefulWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const NavButton({
+    super.key,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  State<NavButton> createState() =>
+      _NavButtonState();
+}
+
+class _NavButtonState
+    extends State<NavButton> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlighted =
+        hover || widget.active;
+
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          hover = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          hover = false;
+        });
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 170,
+          ),
+          margin:
+          const EdgeInsets.only(
+            right: 6,
+          ),
+          padding:
+          const EdgeInsets.symmetric(
+            horizontal: 15,
+            vertical: 13,
+          ),
+          decoration: BoxDecoration(
+            color: widget.active
+                ? softRed
+                : Colors.transparent,
+            borderRadius:
+            BorderRadius.circular(30),
+            border: Border.all(
+              color: highlighted
+                  ? iituRed
+                  : Colors.transparent,
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: highlighted
+                  ? iituRed
+                  : darkText,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DrawerNavTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  const DrawerNavTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: iituRed,
+      ),
+      title: Text(title),
+      onTap: onTap,
+    );
+  }
+}
+
+// ============================================================
+// IMAGE HELPER
+// ============================================================
+
+class AppAssetImage extends StatelessWidget {
   final String path;
   final BoxFit fit;
   final Alignment alignment;
 
-  const AppImage({
+  const AppAssetImage({
     super.key,
     required this.path,
     this.fit = BoxFit.cover,
@@ -6464,992 +8158,26 @@ class AppImage extends StatelessWidget {
 }
 
 // ============================================================
-// HEADINGS
+// SIMPLE REVEAL ANIMATION
 // ============================================================
 
-class PremiumHeading extends StatelessWidget {
-  final String eyebrow;
-  final String title;
-  final String subtitle;
-
-  const PremiumHeading({
-    super.key,
-    required this.eyebrow,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-      children: [
-        Text(
-          eyebrow,
-          style: const TextStyle(
-            color: iituRed,
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          title,
-          style: const TextStyle(
-            color: darkText,
-            fontSize: 34,
-            height: 1.12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -1.3,
-          ),
-        ),
-        const SizedBox(height: 9),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: greyText,
-            fontSize: 13,
-            height: 1.55,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ============================================================
-// FORM SECTION
-// ============================================================
-
-class FormSectionCard extends StatelessWidget {
-  final String number;
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  const FormSectionCard({
-    super.key,
-    required this.number,
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: borderColor,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.018),
-            blurRadius: 24,
-            offset: const Offset(
-              0,
-              9,
-            ),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: softRed,
-                  borderRadius:
-                  BorderRadius.circular(13),
-                ),
-                child: Text(
-                  number,
-                  style: const TextStyle(
-                    color: iituRed,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight:
-                        FontWeight.w600,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: greyText,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 25),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class FormMiniTitle extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const FormMiniTitle({
-    super.key,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: greyText,
-            fontSize: 10.5,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ============================================================
-// FORM CHIPS
-// ============================================================
-
-class SelectionChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const SelectionChip({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius:
-      BorderRadius.circular(30),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 180,
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-        decoration: BoxDecoration(
-          color:
-          selected ? softRed : Colors.white,
-          borderRadius:
-          BorderRadius.circular(30),
-          border: Border.all(
-            color:
-            selected ? iituRed : borderColor,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color:
-              selected ? iituRed : greyText,
-            ),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: TextStyle(
-                color:
-                selected ? iituRed : darkText,
-                fontSize: 11.5,
-                fontWeight: selected
-                    ? FontWeight.w600
-                    : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class IssueQuickChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const IssueQuickChip({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius:
-      BorderRadius.circular(20),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 180,
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color:
-          selected ? softRed : softGrey,
-          borderRadius:
-          BorderRadius.circular(20),
-          border: Border.all(
-            color:
-            selected ? iituRed : softGrey,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color:
-            selected ? iituRed : greyText,
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// LAST REQUEST
-// ============================================================
-
-class LastRequestCard extends StatelessWidget {
-  final ServiceRequestSummary request;
-
-  const LastRequestCard({
-    super.key,
-    required this.request,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F8F5),
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(
-          color: const Color(0xFFCDE7D8),
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (
-            context,
-            constraints,
-            ) {
-          final desktop =
-              constraints.maxWidth >= 650;
-
-          final copy = Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'LATEST REQUEST',
-                style: TextStyle(
-                  color: successGreen,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.3,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                request.category,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                request.reference,
-                style: const TextStyle(
-                  color: greyText,
-                  fontSize: 10.5,
-                ),
-              ),
-            ],
-          );
-
-          final badge = Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 13,
-              vertical: 9,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius:
-              BorderRadius.circular(30),
-            ),
-            child: const Row(
-              mainAxisSize:
-              MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: successGreen,
-                  size: 16,
-                ),
-                SizedBox(width: 6),
-                Text(
-                  'Submitted',
-                  style: TextStyle(
-                    color: successGreen,
-                    fontSize: 10,
-                    fontWeight:
-                    FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          );
-
-          if (!desktop) {
-            return Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                copy,
-                const SizedBox(height: 15),
-                badge,
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Expanded(
-                child: copy,
-              ),
-              badge,
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ============================================================
-// SUPPORT PROMO PARTS
-// ============================================================
-
-class SupportFeatureCard
-    extends StatefulWidget {
-  final IconData icon;
-  final String title;
-  final String text;
-  final VoidCallback onTap;
-
-  const SupportFeatureCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.text,
-    required this.onTap,
-  });
-
-  @override
-  State<SupportFeatureCard> createState() =>
-      _SupportFeatureCardState();
-}
-
-class _SupportFeatureCardState
-    extends State<SupportFeatureCard> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius:
-        BorderRadius.circular(20),
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 180,
-          ),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius:
-            BorderRadius.circular(20),
-            border: Border.all(
-              color:
-              hover ? iituRed : borderColor,
-            ),
-            boxShadow: hover
-                ? [
-              BoxShadow(
-                color: Colors.black
-                    .withOpacity(
-                  0.045,
-                ),
-                blurRadius: 20,
-                offset: const Offset(
-                  0,
-                  8,
-                ),
-              ),
-            ]
-                : [],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: softRed,
-                  borderRadius:
-                  BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  widget.icon,
-                  color: iituRed,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                        FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.text,
-                      style: const TextStyle(
-                        color: greyText,
-                        fontSize: 9.5,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class SupportMockRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const SupportMockRow({
-    super.key,
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(
-        bottom: 9,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F9),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: iituRed,
-            size: 17,
-          ),
-          const SizedBox(width: 9),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// EVENT CARD
-// ============================================================
-
-class EventPageCard extends StatefulWidget {
-  final CampusEvent event;
-  final VoidCallback onTap;
-
-  const EventPageCard({
-    super.key,
-    required this.event,
-    required this.onTap,
-  });
-
-  @override
-  State<EventPageCard> createState() =>
-      _EventPageCardState();
-}
-
-class _EventPageCardState
-    extends State<EventPageCard> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius:
-        BorderRadius.circular(26),
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 200,
-          ),
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius:
-            BorderRadius.circular(26),
-            border: Border.all(
-              color:
-              hover ? iituRed : borderColor,
-            ),
-            boxShadow: hover
-                ? [
-              BoxShadow(
-                color: Colors.black
-                    .withOpacity(
-                  0.05,
-                ),
-                blurRadius: 28,
-                offset: const Offset(
-                  0,
-                  12,
-                ),
-              ),
-            ]
-                : [],
-          ),
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 215,
-                width: double.infinity,
-                child: HoverImage(
-                  image:
-                  widget.event.image,
-                ),
-              ),
-
-              Padding(
-                padding:
-                const EdgeInsets.all(22),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          widget.event.date,
-                          style:
-                          const TextStyle(
-                            color: iituRed,
-                            fontSize: 9,
-                            fontWeight:
-                            FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          widget.event.category
-                              .toUpperCase(),
-                          style:
-                          const TextStyle(
-                            color: greyText,
-                            fontSize: 8.5,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Text(
-                      widget.event.title,
-                      style: const TextStyle(
-                        fontSize: 19,
-                        height: 1.15,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-
-                    const SizedBox(height: 11),
-
-                    Text(
-                      widget.event.description,
-                      maxLines: 3,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: greyText,
-                        fontSize: 11.5,
-                        height: 1.55,
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    Row(
-                      children: [
-                        const Text(
-                          'View Event',
-                          style: TextStyle(
-                            color: iituRed,
-                            fontSize: 11,
-                            fontWeight:
-                            FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        AnimatedRotation(
-                          turns:
-                          hover ? 0.04 : 0,
-                          duration:
-                          const Duration(
-                            milliseconds: 180,
-                          ),
-                          child: const Icon(
-                            Icons.north_east,
-                            color: iituRed,
-                            size: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class EventMetaChip extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const EventMetaChip({
-    super.key,
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 10,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: borderColor,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: iituRed,
-            size: 16,
-          ),
-          const SizedBox(width: 7),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// HEADER
-// ============================================================
-
-class HeaderNavButton extends StatefulWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const HeaderNavButton({
-    super.key,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  State<HeaderNavButton> createState() =>
-      _HeaderNavButtonState();
-}
-
-class _HeaderNavButtonState
-    extends State<HeaderNavButton> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final highlighted =
-        hover || widget.active;
-
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 170,
-          ),
-          margin: const EdgeInsets.only(
-            right: 7,
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 17,
-            vertical: 10,
-          ),
-          decoration: BoxDecoration(
-            color: widget.active
-                ? softRed
-                : Colors.transparent,
-            borderRadius:
-            BorderRadius.circular(30),
-            border: Border.all(
-              color: highlighted
-                  ? iituRed
-                  : Colors.transparent,
-            ),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              color: highlighted
-                  ? iituRed
-                  : darkText,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              letterSpacing: -0.2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class HeaderIconButton extends StatefulWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const HeaderIconButton({
-    super.key,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  State<HeaderIconButton> createState() =>
-      _HeaderIconButtonState();
-}
-
-class _HeaderIconButtonState
-    extends State<HeaderIconButton> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: IconButton(
-        onPressed: widget.onTap,
-        style: IconButton.styleFrom(
-          backgroundColor:
-          hover ? softRed : Colors.transparent,
-          foregroundColor:
-          hover ? iituRed : darkText,
-        ),
-        icon: Icon(
-          widget.icon,
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ANIMATIONS
-// ============================================================
-
-class RevealAfterDelay
-    extends StatefulWidget {
+class RevealWidget extends StatefulWidget {
   final Widget child;
   final int delay;
 
-  const RevealAfterDelay({
+  const RevealWidget({
     super.key,
     required this.child,
     required this.delay,
   });
 
   @override
-  State<RevealAfterDelay> createState() =>
-      _RevealAfterDelayState();
+  State<RevealWidget> createState() =>
+      _RevealWidgetState();
 }
 
-class _RevealAfterDelayState
-    extends State<RevealAfterDelay> {
+class _RevealWidgetState
+    extends State<RevealWidget> {
   bool visible = false;
 
   @override
@@ -7489,1431 +8217,6 @@ class _RevealAfterDelayState
         ),
         opacity: visible ? 1 : 0,
         child: widget.child,
-      ),
-    );
-  }
-}
-
-class SimpleReveal extends StatelessWidget {
-  final Widget child;
-  final int delay;
-
-  const SimpleReveal({
-    super.key,
-    required this.child,
-    required this.delay,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      duration: Duration(
-        milliseconds: 620 + delay,
-      ),
-      curve: Curves.easeOutCubic,
-      tween: Tween(
-        begin: 0,
-        end: 1,
-      ),
-      builder: (
-          context,
-          value,
-          widget,
-          ) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(
-              0,
-              28 * (1 - value),
-            ),
-            child: widget,
-          ),
-        );
-      },
-      child: child,
-    );
-  }
-}
-
-class AnimatedHeroImage extends StatelessWidget {
-  final String image;
-
-  const AnimatedHeroImage({
-    super.key,
-    required this.image,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(
-        seconds: 4,
-      ),
-      curve: Curves.easeOut,
-      tween: Tween(
-        begin: 1.055,
-        end: 1,
-      ),
-      builder: (
-          context,
-          scale,
-          child,
-          ) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
-      },
-      child: AppImage(
-        path: image,
-        fit: BoxFit.cover,
-      ),
-    );
-  }
-}
-
-// ============================================================
-// PREMIUM HOVER
-// ============================================================
-
-class PremiumHover extends StatefulWidget {
-  final Widget child;
-
-  const PremiumHover({
-    super.key,
-    required this.child,
-  });
-
-  @override
-  State<PremiumHover> createState() =>
-      _PremiumHoverState();
-}
-
-class _PremiumHoverState
-    extends State<PremiumHover> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: AnimatedScale(
-        duration: const Duration(
-          milliseconds: 180,
-        ),
-        scale: hover ? 1.011 : 1,
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 180,
-          ),
-          decoration: BoxDecoration(
-            borderRadius:
-            BorderRadius.circular(28),
-            boxShadow: hover
-                ? [
-              BoxShadow(
-                color: Colors.black
-                    .withOpacity(
-                  0.05,
-                ),
-                blurRadius: 30,
-                offset: const Offset(
-                  0,
-                  12,
-                ),
-              ),
-            ]
-                : [],
-          ),
-          child: widget.child,
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// HOVER IMAGE
-// ============================================================
-
-class HoverImage extends StatefulWidget {
-  final String image;
-
-  const HoverImage({
-    super.key,
-    required this.image,
-  });
-
-  @override
-  State<HoverImage> createState() =>
-      _HoverImageState();
-}
-
-class _HoverImageState
-    extends State<HoverImage> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: ClipRect(
-        child: AnimatedScale(
-          duration: const Duration(
-            milliseconds: 450,
-          ),
-          curve: Curves.easeOutCubic,
-          scale: hover ? 1.04 : 1,
-          child: AppImage(
-            path: widget.image,
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ACADEMIC VALUE
-// ============================================================
-
-class CompactAcademicValue
-    extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const CompactAcademicValue({
-    super.key,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 90,
-      child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: greyText,
-              fontSize: 8.5,
-              letterSpacing: 1,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AcademicMetricCard
-    extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String caption;
-
-  const AcademicMetricCard({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.caption,
-  });
-
-  @override
-  State<AcademicMetricCard> createState() =>
-      _AcademicMetricCardState();
-}
-
-class _AcademicMetricCardState
-    extends State<AcademicMetricCard> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 180,
-        ),
-        height: 145,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: hover
-              ? const Color(0xFFFFF6F7)
-              : const Color(0xFFF8F8FA),
-          borderRadius:
-          BorderRadius.circular(20),
-          border: Border.all(
-            color:
-            hover ? iituRed : borderColor,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  widget.icon,
-                  size: 17,
-                  color: iituRed,
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    color: greyText,
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 13),
-            Text(
-              widget.value,
-              style: const TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -1,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.caption,
-              style: const TextStyle(
-                color: greyText,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ORBIT HUB
-// ============================================================
-
-class OrbitHub extends StatefulWidget {
-  final ValueChanged<String> onSelect;
-
-  const OrbitHub({
-    super.key,
-    required this.onSelect,
-  });
-
-  @override
-  State<OrbitHub> createState() =>
-      _OrbitHubState();
-}
-
-class _OrbitHubState extends State<OrbitHub>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController controller;
-
-  final List<OrbitItemData> items = const [
-    OrbitItemData(
-      'Timetable',
-      Icons.calendar_today_outlined,
-    ),
-    OrbitItemData(
-      'Library',
-      Icons.local_library_outlined,
-    ),
-    OrbitItemData(
-      'Campus',
-      Icons.location_on_outlined,
-    ),
-    OrbitItemData(
-      'Calendar',
-      Icons.event_available_outlined,
-    ),
-    OrbitItemData(
-      'Events',
-      Icons.groups_outlined,
-    ),
-    OrbitItemData(
-      'Services',
-      Icons.support_agent_outlined,
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        seconds: 38,
-      ),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 400,
-        height: 400,
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (
-              context,
-              child,
-              ) {
-            const center = 200.0;
-            const radius = 139.0;
-            const buttonSize = 76.0;
-
-            return Stack(
-              children: [
-                Positioned(
-                  left: 100,
-                  top: 100,
-                  child: Container(
-                    width: 200,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: borderColor,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black
-                              .withOpacity(
-                            0.04,
-                          ),
-                          blurRadius: 32,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment:
-                      MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 94,
-                          height: 42,
-                          child: AppImage(
-                            path:
-                            'assets/images/iitu_logo.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'STUDENT HUB',
-                          style: TextStyle(
-                            color: iituRed,
-                            fontSize: 8.5,
-                            fontWeight:
-                            FontWeight.w600,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                ...List.generate(
-                  items.length,
-                      (index) {
-                    final angle =
-                        (2 *
-                            math.pi *
-                            index /
-                            items.length) +
-                            controller.value *
-                                2 *
-                                math.pi;
-
-                    final x = center +
-                        math.cos(angle) *
-                            radius -
-                        buttonSize / 2;
-
-                    final y = center +
-                        math.sin(angle) *
-                            radius -
-                        buttonSize / 2;
-
-                    return Positioned(
-                      left: x,
-                      top: y,
-                      child: OrbitButton(
-                        data: items[index],
-                        onTap: () {
-                          widget.onSelect(
-                            items[index].label,
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class OrbitItemData {
-  final String label;
-  final IconData icon;
-
-  const OrbitItemData(
-      this.label,
-      this.icon,
-      );
-}
-
-class OrbitButton extends StatefulWidget {
-  final OrbitItemData data;
-  final VoidCallback onTap;
-
-  const OrbitButton({
-    super.key,
-    required this.data,
-    required this.onTap,
-  });
-
-  @override
-  State<OrbitButton> createState() =>
-      _OrbitButtonState();
-}
-
-class _OrbitButtonState
-    extends State<OrbitButton> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          duration: const Duration(
-            milliseconds: 170,
-          ),
-          scale: hover ? 1.09 : 1,
-          child: Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color:
-              hover ? iituRed : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: hover
-                    ? iituRed
-                    : borderColor,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black
-                      .withOpacity(
-                    0.05,
-                  ),
-                  blurRadius: 15,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment:
-              MainAxisAlignment.center,
-              children: [
-                Icon(
-                  widget.data.icon,
-                  size: 19,
-                  color: hover
-                      ? Colors.white
-                      : iituRed,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  widget.data.label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: hover
-                        ? Colors.white
-                        : darkText,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ANNOUNCEMENT VISUALS
-// ============================================================
-
-enum AnnouncementVisualMode {
-  partner,
-  academic,
-}
-
-class AnnouncementMotionVisual
-    extends StatefulWidget {
-  final AnnouncementVisualMode mode;
-
-  const AnnouncementMotionVisual({
-    super.key,
-    required this.mode,
-  });
-
-  @override
-  State<AnnouncementMotionVisual> createState() =>
-      _AnnouncementMotionVisualState();
-}
-
-class _AnnouncementMotionVisualState
-    extends State<AnnouncementMotionVisual>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController controller;
-
-  @override
-  void initState() {
-    super.initState();
-
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        seconds: 7,
-      ),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (
-          context,
-          child,
-          ) {
-        if (widget.mode ==
-            AnnouncementVisualMode.partner) {
-          return _partnerVisual();
-        }
-
-        return _academicVisual();
-      },
-    );
-  }
-
-  Widget _partnerVisual() {
-    final pulse =
-        math.sin(
-          controller.value *
-              math.pi *
-              2,
-        ) *
-            5;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFF0EFF3),
-                  Color(0xFFF9F9FA),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        Center(
-          child: Container(
-            width: 86,
-            height: 86,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: borderColor,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black
-                      .withOpacity(
-                    0.04,
-                  ),
-                  blurRadius: 22,
-                ),
-              ],
-            ),
-            child: SizedBox(
-              width: 57,
-              height: 35,
-              child: AppImage(
-                path:
-                'assets/images/iitu_logo.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        ),
-
-        Positioned(
-          left: 22,
-          top: 45 + pulse,
-          child: const MiniVisualCard(
-            icon: Icons.language_rounded,
-            text: 'Global',
-          ),
-        ),
-
-        Positioned(
-          right: 20,
-          top: 58 - pulse,
-          child: const MiniVisualCard(
-            icon: Icons.school_outlined,
-            text: 'Partner',
-          ),
-        ),
-
-        Positioned(
-          left: 40,
-          bottom: 28 - pulse,
-          child: const MiniVisualCard(
-            icon: Icons.flight_takeoff,
-            text: 'Mobility',
-          ),
-        ),
-
-        Positioned(
-          right: 36,
-          bottom: 24 + pulse,
-          child: const MiniVisualCard(
-            icon:
-            Icons.workspace_premium_outlined,
-            text: 'Degree',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _academicVisual() {
-    final pulse =
-        math.sin(
-          controller.value *
-              math.pi *
-              2,
-        ) *
-            7;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFFFF8F9),
-                  Color(0xFFF1EFF2),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        Center(
-          child: Container(
-            width: 78,
-            height: 78,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: iituRed,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: iituRed.withOpacity(
-                    0.18,
-                  ),
-                  blurRadius: 24,
-                ),
-              ],
-            ),
-            child: const Text(
-              'IITU',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-
-        Align(
-          alignment: Alignment(
-            -0.72,
-            -0.45 + pulse / 150,
-          ),
-          child: const NetworkBubble(
-            icon: Icons.schedule,
-            text: 'Schedule',
-          ),
-        ),
-
-        Align(
-          alignment: Alignment(
-            0.72,
-            -0.40 - pulse / 150,
-          ),
-          child: const NetworkBubble(
-            icon: Icons.menu_book_outlined,
-            text: 'Courses',
-          ),
-        ),
-
-        Align(
-          alignment: Alignment(
-            -0.68,
-            0.48 - pulse / 150,
-          ),
-          child: const NetworkBubble(
-            icon: Icons.assignment_outlined,
-            text: 'Semester',
-          ),
-        ),
-
-        Align(
-          alignment: Alignment(
-            0.68,
-            0.45 + pulse / 150,
-          ),
-          child: const NetworkBubble(
-            icon: Icons.notifications_none,
-            text: 'Updates',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class MiniVisualCard extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const MiniVisualCard({
-    super.key,
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 9,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: borderColor,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color:
-            Colors.black.withOpacity(0.03),
-            blurRadius: 12,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: iituRed,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class NetworkBubble extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const NetworkBubble({
-    super.key,
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 9,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: borderColor,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: iituRed,
-            size: 17,
-          ),
-          const SizedBox(height: 3),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 8,
-              color: greyText,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ARROW BUTTON
-// ============================================================
-
-class CircularArrowButton
-    extends StatefulWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const CircularArrowButton({
-    super.key,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  State<CircularArrowButton> createState() =>
-      _CircularArrowButtonState();
-}
-
-class _CircularArrowButtonState
-    extends State<CircularArrowButton> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius:
-        BorderRadius.circular(50),
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 180,
-          ),
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color:
-            hover ? iituRed : Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: hover
-                  ? iituRed
-                  : borderColor,
-            ),
-          ),
-          child: Icon(
-            widget.icon,
-            color: hover
-                ? Colors.white
-                : darkText,
-            size: 18,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// CAMPUS VISUAL CARD
-// ============================================================
-
-class CampusVisualCard
-    extends StatefulWidget {
-  final String image;
-  final String title;
-  final String subtitle;
-  final String? number;
-
-  const CampusVisualCard({
-    super.key,
-    required this.image,
-    required this.title,
-    required this.subtitle,
-    this.number,
-  });
-
-  @override
-  State<CampusVisualCard> createState() =>
-      _CampusVisualCardState();
-}
-
-class _CampusVisualCardState
-    extends State<CampusVisualCard> {
-  bool hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          hover = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          hover = false;
-        });
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            AnimatedScale(
-              duration: const Duration(
-                milliseconds: 450,
-              ),
-              scale: hover ? 1.045 : 1,
-              child: AppImage(
-                path: widget.image,
-                fit: BoxFit.cover,
-              ),
-            ),
-
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(
-                      0.72,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: 24,
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-                  if (widget.number !=
-                      null) ...[
-                    Text(
-                      widget.number!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                  ],
-
-                  Text(
-                    widget.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  Text(
-                    widget.subtitle,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            Positioned(
-              right: 20,
-              top: 20,
-              child: AnimatedContainer(
-                duration: const Duration(
-                  milliseconds: 180,
-                ),
-                width: 43,
-                height: 43,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(
-                    hover ? 1 : 0.86,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.north_east,
-                  size: 17,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// GLOBE
-// ============================================================
-
-class AnimatedGlobe extends StatefulWidget {
-  const AnimatedGlobe({
-    super.key,
-  });
-
-  @override
-  State<AnimatedGlobe> createState() =>
-      _AnimatedGlobeState();
-}
-
-class _AnimatedGlobeState
-    extends State<AnimatedGlobe>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController controller;
-
-  @override
-  void initState() {
-    super.initState();
-
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        seconds: 20,
-      ),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (
-          context,
-          child,
-          ) {
-        final pulse =
-            1 +
-                0.12 *
-                    math.sin(
-                      controller.value *
-                          math.pi *
-                          4,
-                    );
-
-        return SizedBox(
-          width: 300,
-          height: 300,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 250,
-                height: 250,
-                decoration: BoxDecoration(
-                  color: const Color(
-                    0xFF174B68,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(
-                        0xFF70C7F0,
-                      ).withOpacity(
-                        0.16,
-                      ),
-                      blurRadius: 45,
-                      spreadRadius: 8,
-                    ),
-                  ],
-                ),
-              ),
-
-              RotationTransition(
-                turns: controller,
-                child: const Icon(
-                  Icons.public_rounded,
-                  size: 218,
-                  color: Color(
-                    0xFF72A9C5,
-                  ),
-                ),
-              ),
-
-              Transform.translate(
-                offset: const Offset(
-                  47,
-                  -42,
-                ),
-                child: Transform.scale(
-                  scale: pulse,
-                  child: Container(
-                    width: 19,
-                    height: 19,
-                    decoration: BoxDecoration(
-                      color: iituRed,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                          iituRed.withOpacity(
-                            0.5,
-                          ),
-                          blurRadius: 20,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                right: 1,
-                top: 73,
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white
-                        .withOpacity(
-                      0.12,
-                    ),
-                    borderRadius:
-                    BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white
-                          .withOpacity(
-                        0.17,
-                      ),
-                    ),
-                  ),
-                  child: const Text(
-                    'IITU · Kazakhstan',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ============================================================
-// PROFILE LINE
-// ============================================================
-
-class ProfileLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const ProfileLine({
-    super.key,
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 12,
-      ),
-      child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: greyText,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: greyText,
-                fontSize: 11,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
