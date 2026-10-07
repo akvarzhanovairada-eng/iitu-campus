@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -462,8 +463,7 @@ class CampusScaffold extends StatelessWidget {
       return;
     }
 
-    // Requirement: navigation between registered routes
-    // uses Navigator.pushNamed().
+    // Navigation between registered routes uses Navigator.pushNamed().
     safePushNamed(
       context,
       route,
@@ -522,12 +522,10 @@ class CampusScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final desktop =
-        MediaQuery.of(context).size.width >= 900;
+    final desktop = MediaQuery.of(context).size.width >= 1000;
 
     return Scaffold(
       backgroundColor: pageBackground,
-
       appBar: AppBar(
         automaticallyImplyLeading: !desktop,
         leading: desktop &&
@@ -539,102 +537,49 @@ class CampusScaffold extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_rounded),
         )
             : null,
-        toolbarHeight: desktop ? 78 : 68,
+        toolbarHeight: desktop ? 72 : 68,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
-
         title: Row(
           children: [
             SizedBox(
               width: desktop ? 145 : 110,
               height: 42,
-              child: AppAssetImage(
+              child: const AppAssetImage(
                 path: 'assets/images/iitu_logo.png',
                 fit: BoxFit.contain,
                 alignment: Alignment.centerLeft,
               ),
             ),
-
-            if (desktop) ...[
-              const SizedBox(width: 35),
-
-              NavButton(
-                label: 'Home',
-                active: currentRoute == AppRoutes.home,
-                onTap: () => _navigate(
-                  context,
-                  AppRoutes.home,
-                ),
+            if (desktop && title != null) ...[
+              const SizedBox(width: 24),
+              Container(
+                width: 1,
+                height: 26,
+                color: borderColor,
               ),
-
-              NavButton(
-                label: 'Schedule',
-                active:
-                currentRoute == AppRoutes.timetable,
-                onTap: () => _navigate(
-                  context,
-                  AppRoutes.timetable,
-                ),
-              ),
-
-              NavButton(
-                label: 'Events',
-                active:
-                currentRoute == AppRoutes.events,
-                onTap: () => _navigate(
-                  context,
-                  AppRoutes.events,
-                ),
-              ),
-
-              NavButton(
-                label: 'Campus',
-                active:
-                currentRoute == AppRoutes.campus,
-                onTap: () => _navigate(
-                  context,
-                  AppRoutes.campus,
-                ),
-              ),
-
-              NavButton(
-                label: 'Services',
-                active:
-                currentRoute == AppRoutes.services,
-                onTap: () => _navigate(
-                  context,
-                  AppRoutes.services,
-                ),
-              ),
-
-              NavButton(
-                label: 'Profile',
-                active:
-                currentRoute == AppRoutes.profile,
-                onTap: () => _navigate(
-                  context,
-                  AppRoutes.profile,
+              const SizedBox(width: 18),
+              Text(
+                title!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ],
         ),
-
         actions: [
           IconButton(
             tooltip: 'Search',
             onPressed: () => _showSearchDialog(context),
-            icon: const Icon(
-              Icons.search_rounded,
-            ),
+            icon: const Icon(Icons.search_rounded),
           ),
           IconButton(
             tooltip: 'Notifications',
             onPressed: () => _showNotifications(context),
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-            ),
+            icon: const Icon(Icons.notifications_none_rounded),
           ),
           const SizedBox(width: 5),
           GestureDetector(
@@ -656,6 +601,7 @@ class CampusScaffold extends StatelessWidget {
         ],
       ),
 
+      // On mobile the left navigation becomes a Drawer.
       drawer: desktop
           ? null
           : Drawer(
@@ -673,8 +619,7 @@ class CampusScaffold extends StatelessWidget {
                 ),
               ),
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
                     radius: 28,
@@ -702,85 +647,73 @@ class CampusScaffold extends StatelessWidget {
                 ],
               ),
             ),
-
             DrawerNavTile(
               icon: Icons.home_outlined,
               title: 'Home',
               onTap: () {
                 Navigator.pop(context);
-                _navigate(
-                  context,
-                  AppRoutes.home,
-                );
+                _navigate(context, AppRoutes.home);
               },
             ),
-
             DrawerNavTile(
               icon: Icons.calendar_month_outlined,
               title: 'Schedule & Planner',
               onTap: () {
                 Navigator.pop(context);
-                _navigate(
-                  context,
-                  AppRoutes.timetable,
-                );
+                _navigate(context, AppRoutes.timetable);
               },
             ),
-
             DrawerNavTile(
               icon: Icons.event_outlined,
               title: 'Events',
               onTap: () {
                 Navigator.pop(context);
-                _navigate(
-                  context,
-                  AppRoutes.events,
-                );
+                _navigate(context, AppRoutes.events);
               },
             ),
-
             DrawerNavTile(
               icon: Icons.map_outlined,
               title: 'Campus',
               onTap: () {
                 Navigator.pop(context);
-                _navigate(
-                  context,
-                  AppRoutes.campus,
-                );
+                _navigate(context, AppRoutes.campus);
               },
             ),
-
             DrawerNavTile(
               icon: Icons.support_agent_outlined,
               title: 'Services',
               onTap: () {
                 Navigator.pop(context);
-                _navigate(
-                  context,
-                  AppRoutes.services,
-                );
+                _navigate(context, AppRoutes.services);
               },
             ),
-
             DrawerNavTile(
               icon: Icons.person_outline,
               title: 'Profile',
               onTap: () {
                 Navigator.pop(context);
-                _navigate(
-                  context,
-                  AppRoutes.profile,
-                );
+                _navigate(context, AppRoutes.profile);
               },
             ),
           ],
         ),
       ),
 
+      // Desktop keeps a permanent left menu. The page itself is still
+      // opened with Navigator routes; this sidebar is only the control UI.
       body: SafeArea(
         top: false,
-        child: child,
+        child: desktop
+            ? Row(
+          children: [
+            DesktopSidebar(
+              currentRoute: currentRoute,
+              onNavigate: (route) => _navigate(context, route),
+            ),
+            Expanded(child: child),
+          ],
+        )
+            : child,
       ),
 
       bottomNavigationBar: desktop
@@ -796,34 +729,19 @@ class CampusScaffold extends StatelessWidget {
         onTap: (index) {
           switch (index) {
             case 0:
-              _navigate(
-                context,
-                AppRoutes.home,
-              );
+              _navigate(context, AppRoutes.home);
               break;
             case 1:
-              _navigate(
-                context,
-                AppRoutes.events,
-              );
+              _navigate(context, AppRoutes.events);
               break;
             case 2:
-              _navigate(
-                context,
-                AppRoutes.campus,
-              );
+              _navigate(context, AppRoutes.campus);
               break;
             case 3:
-              _navigate(
-                context,
-                AppRoutes.services,
-              );
+              _navigate(context, AppRoutes.services);
               break;
             case 4:
-              _navigate(
-                context,
-                AppRoutes.profile,
-              );
+              _navigate(context, AppRoutes.profile);
               break;
           }
         },
@@ -844,12 +762,8 @@ class CampusScaffold extends StatelessWidget {
             label: 'Campus',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.support_agent_outlined,
-            ),
-            activeIcon: Icon(
-              Icons.support_agent,
-            ),
+            icon: Icon(Icons.support_agent_outlined),
+            activeIcon: Icon(Icons.support_agent),
             label: 'Services',
           ),
           BottomNavigationBarItem(
@@ -858,6 +772,218 @@ class CampusScaffold extends StatelessWidget {
             label: 'Profile',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class DesktopSidebar extends StatelessWidget {
+  final String currentRoute;
+  final ValueChanged<String> onNavigate;
+
+  const DesktopSidebar({
+    super.key,
+    required this.currentRoute,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 220,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          right: BorderSide(color: borderColor),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'CAMPUS MENU',
+                style: TextStyle(
+                  color: greyText,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                SidebarNavItem(
+                  icon: Icons.home_outlined,
+                  label: 'Home',
+                  active: currentRoute == AppRoutes.home,
+                  onTap: () => onNavigate(AppRoutes.home),
+                ),
+                SidebarNavItem(
+                  icon: Icons.calendar_month_outlined,
+                  label: 'Schedule',
+                  active: currentRoute == AppRoutes.timetable,
+                  onTap: () => onNavigate(AppRoutes.timetable),
+                ),
+                SidebarNavItem(
+                  icon: Icons.event_outlined,
+                  label: 'Events',
+                  active: currentRoute == AppRoutes.events,
+                  onTap: () => onNavigate(AppRoutes.events),
+                ),
+                SidebarNavItem(
+                  icon: Icons.map_outlined,
+                  label: 'Campus',
+                  active: currentRoute == AppRoutes.campus,
+                  onTap: () => onNavigate(AppRoutes.campus),
+                ),
+                SidebarNavItem(
+                  icon: Icons.support_agent_outlined,
+                  label: 'Services',
+                  active: currentRoute == AppRoutes.services,
+                  onTap: () => onNavigate(AppRoutes.services),
+                ),
+                SidebarNavItem(
+                  icon: Icons.person_outline,
+                  label: 'Profile',
+                  active: currentRoute == AppRoutes.profile,
+                  onTap: () => onNavigate(AppRoutes.profile),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 8, 12, 18),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: softRed,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: iituRed.withOpacity(0.10),
+              ),
+            ),
+            child: const Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundImage: AssetImage(
+                    'assets/images/profile_irada.png',
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Irada',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Network Security',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: greyText,
+                          fontSize: 8.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SidebarNavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const SidebarNavItem({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  State<SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<SidebarNavItem> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlighted = widget.active || hover;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => hover = true),
+        onExit: (_) => setState(() => hover = false),
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+            decoration: BoxDecoration(
+              color: widget.active
+                  ? softRed
+                  : hover
+                  ? const Color(0xFFF8F8FA)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: widget.active
+                    ? iituRed.withOpacity(0.22)
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  size: 19,
+                  color: highlighted ? iituRed : greyText,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: highlighted ? iituRed : darkText,
+                    fontSize: 11.5,
+                    fontWeight:
+                    widget.active ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -976,8 +1102,112 @@ class HomeScreen extends StatelessWidget {
 // HERO
 // ============================================================
 
-class HeroHomeSection extends StatelessWidget {
+class HeroHomeSection extends StatefulWidget {
   const HeroHomeSection({super.key});
+
+  @override
+  State<HeroHomeSection> createState() => _HeroHomeSectionState();
+}
+
+class _HeroHomeSectionState extends State<HeroHomeSection> {
+  static const List<String> _heroImages = [
+    'assets/images/hero_campus.png',
+    'assets/images/iitu_campus2.png',
+    'assets/images/iitu_campus3.png',
+  ];
+
+  int _currentImage = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // A slow automatic hero slider keeps the Home page alive without
+    // distracting from the text or navigation.
+    _timer = Timer.periodic(
+      const Duration(seconds: 6),
+          (_) {
+        if (!mounted) return;
+        setState(() {
+          _currentImage = (_currentImage + 1) % _heroImages.length;
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Widget _animatedImage() {
+    final path = _heroImages[_currentImage];
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 1100),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(path),
+        duration: const Duration(milliseconds: 5600),
+        curve: Curves.easeOutCubic,
+        tween: Tween<double>(
+          begin: 1.035,
+          end: 1.0,
+        ),
+        builder: (
+            context,
+            scale,
+            child,
+            ) {
+          return Transform.scale(
+            scale: scale,
+            child: child,
+          );
+        },
+        child: AppAssetImage(
+          path: path,
+        ),
+      ),
+    );
+  }
+
+  Widget _indicators() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(
+        _heroImages.length,
+            (index) {
+          final active = index == _currentImage;
+
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.only(left: 6),
+            width: active ? 22 : 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: active ? iituRed : Colors.white.withOpacity(0.78),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -986,8 +1216,7 @@ class HeroHomeSection extends StatelessWidget {
           context,
           constraints,
           ) {
-        final desktop =
-            constraints.maxWidth >= 850;
+        final desktop = constraints.maxWidth >= 850;
 
         if (!desktop) {
           return Container(
@@ -1007,9 +1236,18 @@ class HeroHomeSection extends StatelessWidget {
                 ),
                 SizedBox(
                   height: 330,
-                  child: AppAssetImage(
-                    path:
-                    'assets/images/hero_campus.png',
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRect(
+                        child: _animatedImage(),
+                      ),
+                      Positioned(
+                        right: 18,
+                        bottom: 18,
+                        child: _indicators(),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1022,30 +1260,9 @@ class HeroHomeSection extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              TweenAnimationBuilder<double>(
-                duration: const Duration(
-                  seconds: 4,
-                ),
-                tween: Tween(
-                  begin: 1.05,
-                  end: 1,
-                ),
-                builder: (
-                    context,
-                    scale,
-                    child,
-                    ) {
-                  return Transform.scale(
-                    scale: scale,
-                    child: child,
-                  );
-                },
-                child: AppAssetImage(
-                  path:
-                  'assets/images/hero_campus.png',
-                ),
+              ClipRect(
+                child: _animatedImage(),
               ),
-
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1066,18 +1283,20 @@ class HeroHomeSection extends StatelessWidget {
                   ),
                 ),
               ),
-
               const Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
                   width: 690,
                   child: Padding(
-                    padding: EdgeInsets.only(
-                      left: 52,
-                    ),
+                    padding: EdgeInsets.only(left: 52),
                     child: HeroCopy(),
                   ),
                 ),
+              ),
+              Positioned(
+                right: 28,
+                bottom: 26,
+                child: _indicators(),
               ),
             ],
           ),
@@ -7814,8 +8033,7 @@ class AcademicRecordTile
 // COMMON CAMPUS IMAGE CARD
 // ============================================================
 
-class CampusImageCard
-    extends StatelessWidget {
+class CampusImageCard extends StatefulWidget {
   final String image;
   final String title;
   final String subtitle;
@@ -7828,59 +8046,75 @@ class CampusImageCard
   });
 
   @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          AppAssetImage(
-            path: image,
-          ),
+  State<CampusImageCard> createState() => _CampusImageCardState();
+}
 
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(
-                    0.7,
-                  ),
-                ],
+class _CampusImageCardState extends State<CampusImageCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AnimatedScale(
+              scale: hover ? 1.045 : 1.0,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+              child: AppAssetImage(
+                path: widget.image,
               ),
             ),
-          ),
-
-          Positioned(
-            left: 22,
-            right: 22,
-            bottom: 22,
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w600,
-                  ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.7),
+                  ],
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            Positioned(
+              left: 22,
+              right: 22,
+              bottom: 22,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                offset: hover ? const Offset(0, -0.04) : Offset.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      widget.subtitle,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
