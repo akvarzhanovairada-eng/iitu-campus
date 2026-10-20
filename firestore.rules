@@ -1,19 +1,21 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /campusRequests/{requestId} {
-      allow create: if request.auth != null
+
+    function validCampusRequest() {
+      return request.auth != null
         && request.resource.data.keys().hasAll([
           'ownerUid', 'studentName', 'studentId', 'email', 'phone',
           'serviceCategory', 'subject', 'description', 'urgency',
           'preferredContact', 'preferredDate', 'declaration',
-          'status', 'createdAt'])
+          'status', 'createdAt'
+        ])
         && request.resource.data.keys().hasOnly([
           'ownerUid', 'studentName', 'studentId', 'email', 'phone',
           'serviceCategory', 'subject', 'description', 'urgency',
           'preferredContact', 'preferredDate', 'declaration',
-          'status', 'createdAt'])
+          'status', 'createdAt'
+        ])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.studentName is string
         && request.resource.data.studentName.size() >= 3
@@ -41,10 +43,24 @@ service cloud.firestore {
         && request.resource.data.declaration == true
         && request.resource.data.status == 'submitted'
         && request.resource.data.createdAt == request.time;
+    }
 
+    // Original coursework collection: each anonymous user can only read
+    // their own requests.
+    match /campusRequests/{requestId} {
+      allow create: if validCampusRequest();
       allow read: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
 
+    // Shared presentation records: authenticated anonymous users can read
+    // all saved records, while a client may only create a record for itself.
+    // This lets the lecturer open the site on another laptop and still see
+    // the same five demonstration requests.
+    match /requestRecords/{requestId} {
+      allow create: if validCampusRequest();
+      allow read: if request.auth != null;
       allow update, delete: if false;
     }
   }

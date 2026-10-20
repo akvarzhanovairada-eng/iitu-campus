@@ -710,7 +710,7 @@ class CampusScaffold extends StatelessWidget {
                   ),
                   DrawerNavTile(
                     icon: Icons.receipt_long_outlined,
-                    title: 'My Requests',
+                    title: 'Request Records',
                     onTap: () {
                       Navigator.pop(context);
                       _navigate(context, AppRoutes.requests);
@@ -879,7 +879,7 @@ class DesktopSidebar extends StatelessWidget {
                 ),
                 SidebarNavItem(
                   icon: Icons.receipt_long_outlined,
-                  label: 'My Requests',
+                  label: 'Request Records',
                   active: currentRoute == AppRoutes.requests,
                   onTap: () => onNavigate(AppRoutes.requests),
                 ),
@@ -3269,7 +3269,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
         throw StateError('Anonymous sign-in was not completed.');
       }
 
-      final ref = FirebaseFirestore.instance.collection('campusRequests').doc();
+      // Keep the secure coursework collection and a shared read-only
+      // records collection in sync. Both documents use the same ID, so the
+      // reference shown after submission is identical on every screen.
+      final firestore = FirebaseFirestore.instance;
+      final ref = firestore.collection('campusRequests').doc();
+      final recordRef = firestore.collection('requestRecords').doc(ref.id);
 
       var storedDescription = _description.trim();
       if (_category == 'Other' && _otherController.text.trim().isNotEmpty) {
@@ -3277,7 +3282,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             'Other issue: ${_otherController.text.trim()}\n$storedDescription';
       }
 
-      await ref.set({
+      final requestData = <String, dynamic>{
         'ownerUid': user.uid,
         'studentName': _studentName.trim(),
         'studentId': _studentId.trim(),
@@ -3292,7 +3297,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
         'declaration': _declaration,
         'status': 'submitted',
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      // One atomic batch means there is never a secure request without its
+      // shared record (or vice versa).
+      final batch = firestore.batch();
+      batch.set(ref, requestData);
+      batch.set(recordRef, requestData);
+      await batch.commit();
 
       _pendingSyncTimer?.cancel();
 
@@ -3997,7 +4009,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               Icons.receipt_long_outlined,
                               size: 18,
                             ),
-                            label: const Text('My Requests'),
+                            label: const Text('Request Records'),
                           ),
                         ],
                       ),
@@ -4767,7 +4779,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
           ),
           const SizedBox(height: 7),
           const Text(
-            'Submit a student service request and it will appear here automatically.',
+            'Submit a student service request and it will be saved here for the demonstration.',
             textAlign: TextAlign.center,
             style: TextStyle(color: greyText, fontSize: 11.5),
           ),
@@ -4829,7 +4841,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
   Widget build(BuildContext context) {
     return CampusScaffold(
       currentRoute: AppRoutes.requests,
-      title: 'My Requests',
+      title: 'Request Records',
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 55, 24, 90),
         child: MaxWidth(
@@ -4838,8 +4850,8 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
             children: [
               const SectionHeading(
                 eyebrow: 'FIRESTORE RECORDS',
-                title: 'My Requests',
-                subtitle: 'All student service requests saved by this browser account are displayed directly from Cloud Firestore.',
+                title: 'Request Records',
+                subtitle: 'Shared student service request records are loaded directly from Cloud Firestore and stay visible on any device.',
               ),
               const SizedBox(height: 24),
               FutureBuilder<User>(
@@ -4861,10 +4873,12 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                     );
                   }
 
-                  final user = userSnapshot.data!;
-                  final query = FirebaseFirestore.instance
-                      .collection('campusRequests')
-                      .where('ownerUid', isEqualTo: user.uid);
+                  // Authentication is still required, but this page reads the
+                  // shared requestRecords collection. Therefore the same saved
+                  // demonstration records are visible on another laptop too.
+                  final query = FirebaseFirestore.instance.collection(
+                    'requestRecords',
+                  );
 
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: query.snapshots(),
@@ -5182,7 +5196,7 @@ class RequestRecordDetailsScreen extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Back to My Requests'),
+                    label: const Text('Back to Request Records'),
                   ),
                 ],
               ),
