@@ -4520,11 +4520,23 @@ class MyRequestsScreen extends StatefulWidget {
 
 class _MyRequestsScreenState extends State<MyRequestsScreen> {
   late Future<User> _userFuture;
+  final TextEditingController _searchController = TextEditingController();
+
+  String _urgencyFilter = 'All';
+  String _serviceFilter = 'All';
+  String _sortOption = 'Newest first';
+  DateTime? _dateFilter;
 
   @override
   void initState() {
     super.initState();
     _userFuture = _ensureAnonymousUser();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<User> _ensureAnonymousUser() async {
@@ -4563,11 +4575,144 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  bool _sameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   String _shortReference(String value) {
     if (value.length <= 12) {
       return value;
     }
     return '${value.substring(0, 10)}...';
+  }
+
+  int _urgencyRank(String value) {
+    switch (value.toLowerCase()) {
+      case 'high':
+        return 0;
+      case 'normal':
+        return 1;
+      case 'low':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _applyAdvancedFilters(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> documents,
+  ) {
+    final queryText = _searchController.text.trim().toLowerCase();
+
+    final filtered = documents.where((document) {
+      final data = document.data();
+
+      if (queryText.isNotEmpty) {
+        final searchableText = [
+          document.id,
+          data['studentName'],
+          data['studentId'],
+          data['email'],
+          data['serviceCategory'],
+          data['subject'],
+          data['description'],
+          data['urgency'],
+          data['status'],
+        ].where((value) => value != null).join(' ').toLowerCase();
+
+        if (!searchableText.contains(queryText)) {
+          return false;
+        }
+      }
+
+      if (_urgencyFilter != 'All' &&
+          '${data['urgency'] ?? ''}' != _urgencyFilter) {
+        return false;
+      }
+
+      if (_serviceFilter != 'All' &&
+          '${data['serviceCategory'] ?? ''}' != _serviceFilter) {
+        return false;
+      }
+
+      if (_dateFilter != null) {
+        final preferredDate = _timestampToDate(data['preferredDate']);
+        if (preferredDate == null || !_sameDay(preferredDate, _dateFilter!)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final aData = a.data();
+      final bData = b.data();
+
+      switch (_sortOption) {
+        case 'Oldest first':
+          final aDate = _timestampToDate(aData['createdAt']);
+          final bDate = _timestampToDate(bData['createdAt']);
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return aDate.compareTo(bDate);
+
+        case 'Urgency: High to Low':
+          return _urgencyRank('${aData['urgency'] ?? ''}')
+              .compareTo(_urgencyRank('${bData['urgency'] ?? ''}'));
+
+        case 'Student: A to Z':
+          return '${aData['studentName'] ?? ''}'.toLowerCase().compareTo(
+            '${bData['studentName'] ?? ''}'.toLowerCase(),
+          );
+
+        case 'Preferred date':
+          final aDate = _timestampToDate(aData['preferredDate']);
+          final bDate = _timestampToDate(bData['preferredDate']);
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return aDate.compareTo(bDate);
+
+        case 'Newest first':
+        default:
+          final aDate = _timestampToDate(aData['createdAt']);
+          final bDate = _timestampToDate(bData['createdAt']);
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return bDate.compareTo(aDate);
+      }
+    });
+
+    return filtered;
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _searchController.clear();
+      _urgencyFilter = 'All';
+      _serviceFilter = 'All';
+      _sortOption = 'Newest first';
+      _dateFilter = null;
+    });
+  }
+
+  Future<void> _pickFilterDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateFilter ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'Filter by preferred date',
+    );
+
+    if (picked != null && mounted) {
+      setState(() {
+        _dateFilter = picked;
+      });
+    }
   }
 
   void _openRequestDetails(
@@ -4598,6 +4743,213 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
           fontSize: 9.5,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+
+  Widget _buildAdvancedFilters({
+    required List<String> services,
+    required int filteredCount,
+    required int totalCount,
+  }) {
+    final hasFilters =
+        _searchController.text.trim().isNotEmpty ||
+        _urgencyFilter != 'All' ||
+        _serviceFilter != 'All' ||
+        _dateFilter != null ||
+        _sortOption != 'Newest first';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Advanced Search & Filters',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Find records by student, reference, service, urgency or preferred date.',
+                      style: TextStyle(color: greyText, fontSize: 10.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Showing $filteredCount of $totalCount',
+                style: const TextStyle(
+                  color: iituRed,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 300,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Search requests',
+                    hintText: 'Name, ID, subject or reference',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 185,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('urgency-$_urgencyFilter'),
+                  initialValue: _urgencyFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Urgency',
+                    prefixIcon: Icon(Icons.priority_high_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'All', child: Text('All urgency')),
+                    DropdownMenuItem(value: 'High', child: Text('High')),
+                    DropdownMenuItem(value: 'Normal', child: Text('Normal')),
+                    DropdownMenuItem(value: 'Low', child: Text('Low')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _urgencyFilter = value;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('service-$_serviceFilter-${services.length}'),
+                  initialValue:
+                      services.contains(_serviceFilter) ||
+                          _serviceFilter == 'All'
+                      ? _serviceFilter
+                      : 'All',
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Service',
+                    prefixIcon: Icon(Icons.category_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'All',
+                      child: Text('All services'),
+                    ),
+                    ...services.map(
+                      (service) => DropdownMenuItem(
+                        value: service,
+                        child: Text(service, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _serviceFilter = value;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 205,
+                child: OutlinedButton.icon(
+                  onPressed: _pickFilterDate,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(55),
+                    alignment: Alignment.centerLeft,
+                    side: const BorderSide(color: borderColor),
+                    foregroundColor: darkText,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(17),
+                    ),
+                  ),
+                  icon: const Icon(Icons.calendar_month_outlined, size: 19),
+                  label: Text(
+                    _dateFilter == null
+                        ? 'Preferred date'
+                        : _formatDate(_dateFilter),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('sort-$_sortOption'),
+                  initialValue: _sortOption,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Sort by',
+                    prefixIcon: Icon(Icons.swap_vert_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Newest first',
+                      child: Text('Newest first'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Oldest first',
+                      child: Text('Oldest first'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Urgency: High to Low',
+                      child: Text('Urgency: High to Low'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Student: A to Z',
+                      child: Text('Student: A to Z'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Preferred date',
+                      child: Text('Preferred date'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _sortOption = value;
+                    });
+                  },
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: hasFilters ? _clearFilters : null,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(150, 55),
+                ),
+                icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                label: const Text('Clear filters'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -4801,6 +5153,40 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     );
   }
 
+  Widget _noMatchesState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 46),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.search_off_rounded, color: greyText, size: 34),
+          const SizedBox(height: 12),
+          const Text(
+            'No matching requests',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Try another search value or clear the active filters.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: greyText, fontSize: 11),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _clearFilters,
+            icon: const Icon(Icons.filter_alt_off_outlined),
+            label: const Text('Clear filters'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _errorState(Object error) {
     return Container(
       width: double.infinity,
@@ -4903,25 +5289,28 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                             QueryDocumentSnapshot<Map<String, dynamic>>
                           >.from(requestSnapshot.data?.docs ?? const []);
 
-                      documents.sort((a, b) {
-                        final aDate = _timestampToDate(a.data()['createdAt']);
-                        final bDate = _timestampToDate(b.data()['createdAt']);
-
-                        if (aDate == null && bDate == null) {
-                          return 0;
-                        }
-                        if (aDate == null) {
-                          return 1;
-                        }
-                        if (bDate == null) {
-                          return -1;
-                        }
-                        return bDate.compareTo(aDate);
-                      });
-
                       if (documents.isEmpty) {
                         return _emptyState();
                       }
+
+                      final services =
+                          documents
+                              .map(
+                                (document) =>
+                                    '${document.data()['serviceCategory'] ?? ''}'
+                                        .trim(),
+                              )
+                              .where((service) => service.isNotEmpty)
+                              .toSet()
+                              .toList()
+                            ..sort(
+                              (a, b) =>
+                                  a.toLowerCase().compareTo(b.toLowerCase()),
+                            );
+
+                      final filteredDocuments = _applyAdvancedFilters(
+                        documents,
+                      );
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4971,14 +5360,23 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              if (constraints.maxWidth >= 860) {
-                                return _buildDesktopTable(documents);
-                              }
-                              return _buildMobileList(documents);
-                            },
+                          _buildAdvancedFilters(
+                            services: services,
+                            filteredCount: filteredDocuments.length,
+                            totalCount: documents.length,
                           ),
+                          const SizedBox(height: 18),
+                          if (filteredDocuments.isEmpty)
+                            _noMatchesState()
+                          else
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                if (constraints.maxWidth >= 860) {
+                                  return _buildDesktopTable(filteredDocuments);
+                                }
+                                return _buildMobileList(filteredDocuments);
+                              },
+                            ),
                         ],
                       );
                     },
