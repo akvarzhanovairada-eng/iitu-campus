@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
+import 'models/campus_content.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,6 +111,7 @@ class AppRoutes {
   static const services = '/services';
   static const requests = '/requests';
   static const events = '/events';
+  static const announcements = '/announcements';
   static const campus = '/campus';
   static const profile = '/profile';
   static const serviceDetail = '/service-detail';
@@ -209,6 +211,7 @@ class IITUCampusApp extends StatelessWidget {
         AppRoutes.services: (_) => const ServicesScreen(),
         AppRoutes.requests: (_) => const MyRequestsScreen(),
         AppRoutes.events: (_) => const EventsScreen(),
+        AppRoutes.announcements: (_) => const AnnouncementsScreen(),
         AppRoutes.campus: (_) => const CampusScreen(),
         AppRoutes.profile: (_) => const ProfileScreen(),
       },
@@ -243,28 +246,6 @@ class IITUCampusApp extends StatelessWidget {
 // ============================================================
 // MODELS
 // ============================================================
-
-class CampusService {
-  final String name;
-  final String description;
-  final String location;
-  final String openingHours;
-  final String contact;
-  final String status;
-  final IconData icon;
-  final Color color;
-
-  const CampusService({
-    required this.name,
-    required this.description,
-    required this.location,
-    required this.openingHours,
-    required this.contact,
-    required this.status,
-    required this.icon,
-    this.color = iituRed,
-  });
-}
 
 class CampusEvent {
   final String title;
@@ -323,71 +304,6 @@ class PlannerItem {
 // ============================================================
 // SAMPLE DATA
 // ============================================================
-
-const campusServices = [
-  CampusService(
-    name: 'IT Helpdesk',
-    description: 'Technical support for university accounts, Wi-Fi, devices and digital services.',
-    location: 'Room 205',
-    openingHours: '09:00 – 18:00',
-    contact: 'helpdesk@iitu.edu.kz',
-    status: 'Open',
-    icon: Icons.support_agent_outlined,
-    color: Color(0xFF3B82F6),
-  ),
-  CampusService(
-    name: 'Student Affairs',
-    description: 'Support with student documents, campus life and general university questions.',
-    location: 'Student Centre',
-    openingHours: '09:00 – 17:30',
-    contact: 'student.affairs@iitu.edu.kz',
-    status: 'Open',
-    icon: Icons.groups_outlined,
-    color: Color(0xFFF59E0B),
-  ),
-  CampusService(
-    name: 'Library Services',
-    description: 'Library access, borrowing support, study rooms and academic resources.',
-    location: 'Level 3',
-    openingHours: '08:30 – 20:00',
-    contact: 'library@iitu.edu.kz',
-    status: 'Open',
-    icon: Icons.local_library_outlined,
-    color: Color(0xFF7C3AED),
-  ),
-  CampusService(
-    name: 'Academic Office',
-    description:
-        'Academic documents, course information and administrative support.',
-    location: 'Room 312',
-    openingHours: '09:00 – 17:00',
-    contact: 'academic@iitu.edu.kz',
-    status: 'Open',
-    icon: Icons.school_outlined,
-    color: Color(0xFF0F9D8A),
-  ),
-  CampusService(
-    name: 'Finance Office',
-    description: 'Questions about tuition payments, invoices and student financial records.',
-    location: 'Room 118',
-    openingHours: '09:00 – 17:00',
-    contact: 'finance@iitu.edu.kz',
-    status: 'Open',
-    icon: Icons.account_balance_wallet_outlined,
-    color: Color(0xFF2E8B57),
-  ),
-  CampusService(
-    name: 'Career Center',
-    description:
-        'Internships, CV support, career events and employment opportunities.',
-    location: 'Room 405',
-    openingHours: '10:00 – 18:00',
-    contact: 'career@iitu.edu.kz',
-    status: 'Open',
-    icon: Icons.work_outline_rounded,
-    color: Color(0xFF4F46E5),
-  ),
-];
 
 const campusEvents = [
   CampusEvent(
@@ -544,6 +460,7 @@ class CampusScaffold extends StatelessWidget {
   int _mobileIndex() {
     switch (currentRoute) {
       case AppRoutes.events:
+      case AppRoutes.announcements:
         return 1;
       case AppRoutes.campus:
         return 2;
@@ -690,6 +607,14 @@ class CampusScaffold extends StatelessWidget {
                     onTap: () {
                       Navigator.pop(context);
                       _navigate(context, AppRoutes.events);
+                    },
+                  ),
+                  DrawerNavTile(
+                    icon: Icons.campaign_outlined,
+                    title: 'Announcements',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate(context, AppRoutes.announcements);
                     },
                   ),
                   DrawerNavTile(
@@ -864,6 +789,12 @@ class DesktopSidebar extends StatelessWidget {
                   label: 'Events',
                   active: currentRoute == AppRoutes.events,
                   onTap: () => onNavigate(AppRoutes.events),
+                ),
+                SidebarNavItem(
+                  icon: Icons.campaign_outlined,
+                  label: 'Announcements',
+                  active: currentRoute == AppRoutes.announcements,
+                  onTap: () => onNavigate(AppRoutes.announcements),
                 ),
                 SidebarNavItem(
                   icon: Icons.map_outlined,
@@ -1068,6 +999,14 @@ class HomeScreen extends StatelessWidget {
                     },
                     onCampus: () {
                       safePushNamed(context, AppRoutes.campus);
+                    },
+                  ),
+
+                  const SizedBox(height: 95),
+
+                  HomeAnnouncementsPreview(
+                    onViewAll: () {
+                      safePushNamed(context, AppRoutes.announcements);
                     },
                   ),
 
@@ -1660,6 +1599,620 @@ class _DashboardCardState extends State<DashboardCard> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// HOME ANNOUNCEMENTS PREVIEW
+// ============================================================
+
+class HomeAnnouncementsPreview extends StatelessWidget {
+  final VoidCallback onViewAll;
+
+  const HomeAnnouncementsPreview({super.key, required this.onViewAll});
+
+  void _openAnnouncement(BuildContext context, Announcement announcement) {
+    safePush(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnnouncementDetailScreen(announcement: announcement),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = campusAnnouncements.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Expanded(
+              child: SectionHeading(
+                eyebrow: 'CAMPUS UPDATES',
+                title: 'Latest announcements.',
+                subtitle: 'Important academic and campus notices in one place.',
+              ),
+            ),
+            TextButton.icon(
+              onPressed: onViewAll,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+              label: const Text('View all'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            double width;
+
+            if (constraints.maxWidth >= 900) {
+              width = (constraints.maxWidth - 28) / 3;
+            } else if (constraints.maxWidth >= 600) {
+              width = (constraints.maxWidth - 14) / 2;
+            } else {
+              width = constraints.maxWidth;
+            }
+
+            return Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: latest.map((announcement) {
+                return SizedBox(
+                  width: width,
+                  child: AnnouncementPreviewCard(
+                    announcement: announcement,
+                    onTap: () => _openAnnouncement(context, announcement),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class AnnouncementPreviewCard extends StatefulWidget {
+  final Announcement announcement;
+  final VoidCallback onTap;
+
+  const AnnouncementPreviewCard({
+    super.key,
+    required this.announcement,
+    required this.onTap,
+  });
+
+  @override
+  State<AnnouncementPreviewCard> createState() =>
+      _AnnouncementPreviewCardState();
+}
+
+class _AnnouncementPreviewCardState extends State<AnnouncementPreviewCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.announcement;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 215,
+          padding: const EdgeInsets.all(21),
+          decoration: BoxDecoration(
+            color: item.isNew ? softRed : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: hover || item.isNew
+                  ? iituRed.withOpacity(0.28)
+                  : borderColor,
+            ),
+            boxShadow: hover
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.045),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(item.icon, color: iituRed, size: 20),
+                  ),
+                  const Spacer(),
+                  if (item.isNew) const NewBadge(),
+                ],
+              ),
+              const SizedBox(height: 17),
+              Text(
+                '${item.category} · ${item.date}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: greyText,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Expanded(
+                child: Text(
+                  item.preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: greyText,
+                    fontSize: 10,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: iituRed,
+                  size: 17,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// ANNOUNCEMENTS SCREEN
+// ============================================================
+
+class AnnouncementsScreen extends StatefulWidget {
+  const AnnouncementsScreen({super.key});
+
+  @override
+  State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
+}
+
+class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
+  // Stable announcement IDs keep bookmark state independent of list position.
+  final Set<String> _bookmarkedIds = <String>{};
+
+  void _toggleBookmark(String id) {
+    setState(() {
+      if (_bookmarkedIds.contains(id)) {
+        _bookmarkedIds.remove(id);
+      } else {
+        _bookmarkedIds.add(id);
+      }
+    });
+  }
+
+  void _openAnnouncement(Announcement announcement) {
+    safePush(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnnouncementDetailScreen(announcement: announcement),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeading(
+          eyebrow: 'CAMPUS CONTENT',
+          title: 'Announcements',
+          subtitle: 'Browse important IITU notices and bookmark the updates you want to remember.',
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const DemoContentBadge(label: 'DEMONSTRATION DATA'),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: borderColor),
+              ),
+              child: Text(
+                '${campusAnnouncements.length} announcements',
+                style: const TextStyle(
+                  color: greyText,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              decoration: BoxDecoration(
+                color: softRed,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Text(
+                '${_bookmarkedIds.length} bookmarked',
+                style: const TextStyle(
+                  color: iituRed,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.announcements,
+      title: 'Announcements',
+      // ListView.builder is the primary scrolling widget required by the lab.
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(24, 55, 24, 90),
+        itemCount: campusAnnouncements.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return MaxWidth(child: _header());
+          }
+
+          final item = campusAnnouncements[index - 1];
+          final saved = _bookmarkedIds.contains(item.id);
+
+          return MaxWidth(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: AnnouncementListCard(
+                announcement: item,
+                bookmarked: saved,
+                onBookmark: () => _toggleBookmark(item.id),
+                onTap: () => _openAnnouncement(item),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class AnnouncementListCard extends StatefulWidget {
+  final Announcement announcement;
+  final bool bookmarked;
+  final VoidCallback onBookmark;
+  final VoidCallback onTap;
+
+  const AnnouncementListCard({
+    super.key,
+    required this.announcement,
+    required this.bookmarked,
+    required this.onBookmark,
+    required this.onTap,
+  });
+
+  @override
+  State<AnnouncementListCard> createState() => _AnnouncementListCardState();
+}
+
+class _AnnouncementListCardState extends State<AnnouncementListCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.announcement;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: hover ? 2 : 0,
+        shadowColor: Colors.black.withOpacity(0.06),
+        color: hover ? const Color(0xFFFFFBFC) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: hover ? iituRed : borderColor),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: widget.onTap,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 12,
+          ),
+          leading: Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: softRed,
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: Icon(item.icon, color: iituRed, size: 23),
+          ),
+          title: Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      item.category.toUpperCase(),
+                      style: const TextStyle(
+                        color: iituRed,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    Text(
+                      '• ${item.date}',
+                      style: const TextStyle(
+                        color: greyText,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (item.isNew) const NewBadge(),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          subtitle: Text(
+            item.preview,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: greyText,
+              fontSize: 10.5,
+              height: 1.5,
+            ),
+          ),
+          isThreeLine: true,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: widget.bookmarked
+                    ? 'Remove bookmark'
+                    : 'Bookmark announcement',
+                onPressed: widget.onBookmark,
+                icon: Icon(
+                  widget.bookmarked
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  color: widget.bookmarked ? iituRed : greyText,
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: greyText,
+                size: 21,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AnnouncementDetailScreen extends StatelessWidget {
+  final Announcement announcement;
+
+  const AnnouncementDetailScreen({super.key, required this.announcement});
+
+  @override
+  Widget build(BuildContext context) {
+    return CampusScaffold(
+      currentRoute: AppRoutes.announcements,
+      title: 'Announcement Details',
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 55, 24, 90),
+        child: MaxWidth(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const DemoContentBadge(label: 'DEMONSTRATION ANNOUNCEMENT'),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 58,
+                          height: 58,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: softRed,
+                            borderRadius: BorderRadius.circular(19),
+                          ),
+                          child: Icon(
+                            announcement.icon,
+                            color: iituRed,
+                            size: 26,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (announcement.isNew) const NewBadge(),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      announcement.category.toUpperCase(),
+                      style: const TextStyle(
+                        color: iituRed,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      announcement.title,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -1,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          color: greyText,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          announcement.date,
+                          style: const TextStyle(color: greyText, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    const Divider(color: borderColor),
+                    const SizedBox(height: 24),
+                    Text(
+                      announcement.detail,
+                      style: const TextStyle(
+                        color: darkText,
+                        fontSize: 13,
+                        height: 1.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Back to Announcements'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NewBadge extends StatelessWidget {
+  const NewBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: iituRed,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: const Text(
+        'NEW',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.7,
+        ),
+      ),
+    );
+  }
+}
+
+class DemoContentBadge extends StatelessWidget {
+  final String label;
+
+  const DemoContentBadge({super.key, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F1F4),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: greyText,
+          fontSize: 8.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.65,
         ),
       ),
     );
@@ -3754,34 +4307,42 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 subtitle: 'Choose a university service to view details or submit a student service request.',
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 18),
+
+              const DemoContentBadge(label: '6 DEMONSTRATION SERVICES'),
+
+              const SizedBox(height: 22),
 
               LayoutBuilder(
                 builder: (context, constraints) {
-                  double width;
+                  // Required responsive GridView: 2 columns on narrow screens,
+                  // 3 on medium screens and 4 on wider layouts.
+                  final columns = constraints.maxWidth >= 700
+                      ? 4
+                      : constraints.maxWidth >= 420
+                      ? 3
+                      : 2;
 
-                  if (constraints.maxWidth >= 900) {
-                    width = (constraints.maxWidth - 28) / 3;
-                  } else if (constraints.maxWidth >= 600) {
-                    width = (constraints.maxWidth - 14) / 2;
-                  } else {
-                    width = constraints.maxWidth;
-                  }
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: campusServices.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
+                      mainAxisExtent: 185,
+                    ),
+                    itemBuilder: (context, index) {
+                      final service = campusServices[index];
 
-                  return Wrap(
-                    spacing: 14,
-                    runSpacing: 14,
-                    children: campusServices.map((service) {
-                      return SizedBox(
-                        width: width,
-                        child: ServiceCard(
-                          service: service,
-                          onTap: () {
-                            _openService(service);
-                          },
-                        ),
+                      return ServiceCard(
+                        service: service,
+                        onTap: () {
+                          _openService(service);
+                        },
                       );
-                    }).toList(),
+                    },
                   );
                 },
               ),
